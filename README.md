@@ -34,7 +34,7 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 
 ## Tech stack
 
-Java 21 · Spring Boot 4.1 · Spring Security (OAuth2 resource server, JWT) · Spring Data JPA (Hibernate) · PostgreSQL · Bean Validation · springdoc-openapi · JUnit 5 + H2 for tests
+Java 21 · Spring Boot 4.1 · Spring Security (OAuth2 resource server, JWT) · Spring Data JPA (Hibernate) · PostgreSQL · Bean Validation · springdoc-openapi · Docker / Docker Compose · JUnit 5 + H2 for tests
 
 ## Project structure
 
@@ -51,7 +51,23 @@ src/main/java/com/blooddonor
 └── util/         GeoUtils (Haversine, bounding box)
 ```
 
-## Running it
+## Quick start with Docker (no Java or PostgreSQL install needed)
+
+With [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed:
+
+```bash
+docker compose up --build
+```
+
+This builds the API image (multi-stage: JDK to build, JRE to run, non-root user) and starts it with PostgreSQL 18.
+The first build downloads dependencies and takes a few minutes. Then open **http://localhost:8080/swagger-ui.html**
+and log in with the demo accounts below.
+
+- Port 8080 already in use? Run with another port, e.g. PowerShell `$env:APP_PORT=9090; docker compose up --build`.
+- Stop: `docker compose down`. Stop and delete the database too: `docker compose down -v`.
+- Override secrets with env vars or a `.env` file: `DB_PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
+
+## Running it without Docker
 
 ### 1. Install PostgreSQL and create the database
 
