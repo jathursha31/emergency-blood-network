@@ -41,6 +41,11 @@ public class AdminUserController {
         return users.enable(id, jwt.getSubject());
     }
 
+    @PostMapping("/users/{id}/unlock")
+    public AccountRow unlock(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
+        return users.unlock(id, jwt.getSubject());
+    }
+
     @PostMapping("/users/{id}/reset-password")
     public PasswordReset resetPassword(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
         return users.resetPassword(id, jwt.getSubject());

@@ -1,7 +1,9 @@
 package com.blooddonor.exception;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -44,8 +46,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(TooManyRequestsException.class)
-    public ProblemDetail tooMany(TooManyRequestsException ex) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+    public ResponseEntity<ProblemDetail> tooMany(TooManyRequestsException ex) {
+        ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+        var res = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS);
+        if (ex.retryAfterSeconds() > 0) {
+            body.setProperty("retryAfterSeconds", ex.retryAfterSeconds());
+            res.header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.retryAfterSeconds()));
+        }
+        return res.body(body);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

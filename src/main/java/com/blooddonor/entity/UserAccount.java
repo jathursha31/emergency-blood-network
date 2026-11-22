@@ -48,6 +48,15 @@ public class UserAccount {
 
     private LocalDateTime lastLoginAt;
 
+    /** Consecutive failed logins since the last success (brute-force protection). */
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int failedLogins;
+
+    private LocalDateTime lastFailedLoginAt;
+
+    /** Login refused until this time after too many failures. */
+    private LocalDateTime lockedUntil;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

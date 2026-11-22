@@ -18,6 +18,11 @@ public record SecurityProperties(
         @DefaultValue("14") long refreshTokenDays,
         /* send the refresh cookie only over https; must be true in production */
         @DefaultValue("false") boolean cookieSecure,
+        /* consecutive failed logins for one username before it is locked */
+        @DefaultValue("5") int maxFailedLogins,
+        @DefaultValue("15") int lockMinutes,
+        /* failed logins from one IP address within lockMinutes before the IP is blocked */
+        @DefaultValue("20") int maxFailedLoginsPerIp,
         /* created on startup if no ADMIN account exists */
         @DefaultValue("admin") String adminUsername,
         @DefaultValue("admin123") String adminPassword

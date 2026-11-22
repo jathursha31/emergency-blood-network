@@ -32,10 +32,12 @@ public class AdminUserService {
     private final RefreshTokenService refreshTokens;
     private final PasswordEncoder encoder;
     private final AuditService audit;
+    private final LoginGuard loginGuard;
     private final SecureRandom random = new SecureRandom();
 
     public AdminUserService(UserAccountRepository accounts, RefreshTokenService refreshTokens,
-                            PasswordEncoder encoder, AuditService audit) {
+                            PasswordEncoder encoder, AuditService audit, LoginGuard loginGuard) {
+        this.loginGuard = loginGuard;
         this.accounts = accounts;
         this.refreshTokens = refreshTokens;
         this.encoder = encoder;
@@ -74,6 +76,15 @@ public class AdminUserService {
         return toRow(a);
     }
 
+    /** Lift a brute-force lock early (e.g. the real user called the help desk). */
+    public AccountRow unlock(Long id, String actor) {
+        UserAccount a = find(id);
+        if (!loginGuard.isLocked(a)) throw new BusinessRuleException(a.getUsername() + " is not locked");
+        loginGuard.unlock(a);
+        audit.record(actor, AuditEvent.Action.ACCOUNT_UNLOCKED, a.getUsername(), null);
+        return toRow(a);
+    }
+
     /** Sets a random temporary password, shown to the admin once, and logs the account out everywhere. */
     public PasswordReset resetPassword(Long id, String actor) {
         UserAccount a = find(id);
@@ -82,6 +93,7 @@ public class AdminUserService {
         String temporary = sb.toString();
         a.setPasswordHash(encoder.encode(temporary));
         long closed = refreshTokens.revokeAllFor(a);
+        loginGuard.unlock(a); // the new password must work right away
         audit.record(actor, AuditEvent.Action.PASSWORD_RESET, a.getUsername(), closed + " session(s) closed");
         return new PasswordReset(a.getUsername(), temporary, closed);
     }
@@ -104,6 +116,7 @@ public class AdminUserService {
         return new AccountRow(a.getId(), a.getUsername(), a.getRole(), name,
                 a.getDonor() == null ? null : a.getDonor().getId(),
                 a.getHospital() == null ? null : a.getHospital().getId(),
-                a.isEnabled(), a.getCreatedAt(), a.getLastLoginAt(), refreshTokens.activeSessions(a.getUsername()));
+                a.isEnabled(), a.getCreatedAt(), a.getLastLoginAt(), refreshTokens.activeSessions(a.getUsername()),
+                loginGuard.isLocked(a) ? a.getLockedUntil() : null);
     }
 }

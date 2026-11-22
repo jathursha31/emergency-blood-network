@@ -14,6 +14,7 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | JWT security | Stateless Spring Security with HS256-signed tokens (Nimbus). BCrypt password hashes. Three roles, plus ownership checks: a hospital only sees its own requests, and a donor's id always comes from the token. |
 | Sessions | 15-minute access tokens plus a 14-day refresh token in an **httpOnly, SameSite=Strict cookie** that JavaScript can't read. Refresh tokens are stored hashed and **rotated on every use**. Replaying an old one revokes every session from that login (theft detection). Logout revokes the token, and "All devices" ends every session. The browser renews tokens silently. |
 | Instant logout | Access tokens carry their session id (`sid`) and the account's token version (`tv`). A validator checks both on every request, cached for 30 s and updated immediately on logout, so a logged-out token gets **401 at once**, not after 15 minutes. The session's open live stream is closed too, and other tabs log out by themselves. |
+| Brute-force protection | 5 failed password or OTP logins in a row lock that username for 15 minutes, even for the right password: `429` with a `Retry-After` header. Unknown usernames lock the same way, so responses never reveal which accounts exist. 20 failures from one IP block that IP. A successful login resets the counter, admins can unlock early, and locks and IP blocks are written to the audit log. All limits are configurable. |
 | Blood compatibility | `BloodGroup` encodes A/B/Rh antigens. A B+ patient gets B+, B-, O+, O- donors. Exact-group donors are listed first so universal O- blood is saved. |
 | Geo search | A lat/lng bounding-box query in PostgreSQL narrows the candidates, then the Haversine formula gives exact km. Works on plain PostgreSQL, no extension needed. |
 | Eligibility rules | Donation gap of at least 90 days, age 18–65, and the donor's availability switch. All rules are configurable. |
@@ -190,7 +191,7 @@ These defaults are for local development only. Elsewhere, set the `JWT_SECRET` (
 | GET | `/api/inventory`, PUT `/{group}`, POST `/{group}/use`, `/{group}/add` | HOSPITAL (own), ADMIN (`?hospitalId=`) | Blood bank |
 | GET | `/api/inventory/overview`, `/api/admin/analytics` | ADMIN | All blood banks, analytics |
 | GET | `/api/admin/users?q=&role=&enabled=&page=` | ADMIN | Search accounts |
-| POST | `/api/admin/users/{id}/disable` `{"reason"}`, `/enable`, `/reset-password` | ADMIN | Manage an account |
+| POST | `/api/admin/users/{id}/disable` `{"reason"}`, `/enable`, `/unlock`, `/reset-password` | ADMIN | Manage an account |
 | GET | `/api/admin/audit?user=&action=&page=` | ADMIN | Audit log, newest first |
 | POST | `/api/auth/change-password` `{"currentPassword","newPassword"}` | any logged in | Change my password |
 | GET | `/api/auth/me` | any logged in | Who am I |
@@ -293,6 +294,9 @@ app.expand-after-minutes=30
 app.security.jwt-expiry-minutes=15
 app.security.refresh-token-days=14
 app.security.cookie-secure=false      # set COOKIE_SECURE=true when served over https
+app.security.max-failed-logins=5
+app.security.lock-minutes=15
+app.security.max-failed-logins-per-ip=20
 jobs.expand-search.cron=0 */5 * * * *
 jobs.eligibility-reminder.cron=0 0 9 * * *
 jobs.refresh-token-cleanup.cron=0 30 3 * * *

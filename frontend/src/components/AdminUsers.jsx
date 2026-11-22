@@ -38,6 +38,10 @@ export function UsersPanel() {
         try { await adminApi.enable(u.id); toast(`${u.username} enabled`, 'ok'); load(); }
         catch (e) { toast(e.message, 'error'); }
     };
+    const unlock = async (u) => {
+        try { await adminApi.unlock(u.id); toast(`${u.username} unlocked`, 'ok'); load(); }
+        catch (e) { toast(e.message, 'error'); }
+    };
     const resetPassword = async (u) => {
         if (!window.confirm(`Reset the password of ${u.username}? Their current password stops working and they are logged out.`)) return;
         try { setReset(await adminApi.resetPassword(u.id)); load(); }
@@ -87,10 +91,15 @@ export function UsersPanel() {
                             <tr key={u.id} className={u.enabled ? '' : 'row-disabled'}>
                                 <td><b>{u.displayName}</b><div className="small muted">{u.username}</div></td>
                                 <td><span className={`badge ${ROLE_BADGE[u.role]}`}>{u.role}</span></td>
-                                <td>{u.enabled ? <span className="badge b-green">ACTIVE</span> : <span className="badge b-gray">DISABLED</span>}</td>
+                                <td>{!u.enabled ? <span className="badge b-gray">DISABLED</span>
+                                    : u.lockedUntil ? <span className="badge b-amber" title={`Too many failed logins. Locked until ${fmtDateTime(u.lockedUntil)}`}>
+                                        🔒 LOCKED</span>
+                                        : <span className="badge b-green">ACTIVE</span>}
+                                    {u.lockedUntil && <div className="small muted">until {fmtDateTime(u.lockedUntil)}</div>}</td>
                                 <td className="small">{u.lastLoginAt ? fmtDateTime(u.lastLoginAt) : <span className="muted">never</span>}</td>
                                 <td>{u.activeSessions}</td>
                                 <td><div className="row" style={{ justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
+                                    {u.lockedUntil && <AsyncButton className="btn green small" onClick={() => unlock(u)}>Unlock</AsyncButton>}
                                     {u.username !== session.username && (u.enabled
                                         ? <AsyncButton className="btn secondary small" onClick={() => disable(u)}>Disable</AsyncButton>
                                         : <AsyncButton className="btn green small" onClick={() => enable(u)}>Enable</AsyncButton>)}
@@ -113,8 +122,10 @@ export function UsersPanel() {
 }
 
 const ACTIONS = ['LOGIN', 'LOGIN_FAILED', 'OTP_LOGIN', 'LOGOUT', 'LOGOUT_ALL', 'TOKEN_REUSE_DETECTED', 'PASSWORD_CHANGED',
-    'PASSWORD_RESET', 'ACCOUNT_DISABLED', 'ACCOUNT_ENABLED', 'DONOR_REGISTERED', 'HOSPITAL_CREATED'];
+    'PASSWORD_RESET', 'ACCOUNT_DISABLED', 'ACCOUNT_ENABLED', 'ACCOUNT_LOCKED', 'ACCOUNT_UNLOCKED', 'IP_BLOCKED',
+    'DONOR_REGISTERED', 'HOSPITAL_CREATED'];
 const ACTION_BADGE = {
+    ACCOUNT_LOCKED: 'b-red', IP_BLOCKED: 'b-red', ACCOUNT_UNLOCKED: 'b-green',
     LOGIN_FAILED: 'b-amber', TOKEN_REUSE_DETECTED: 'b-red', ACCOUNT_DISABLED: 'b-red', PASSWORD_RESET: 'b-amber',
     LOGIN: 'b-green', OTP_LOGIN: 'b-green', ACCOUNT_ENABLED: 'b-green', DONOR_REGISTERED: 'b-blue', HOSPITAL_CREATED: 'b-blue',
 };

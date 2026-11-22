@@ -129,6 +129,7 @@ export const adminApi = {
     users: (params) => api('GET', '/api/admin/users' + qs(params)),
     disable: (id, reason) => api('POST', `/api/admin/users/${id}/disable`, { reason }),
     enable: (id) => api('POST', `/api/admin/users/${id}/enable`),
+    unlock: (id) => api('POST', `/api/admin/users/${id}/unlock`),
     resetPassword: (id) => api('POST', `/api/admin/users/${id}/reset-password`),
     audit: (params) => api('GET', '/api/admin/audit' + qs(params)),
 };

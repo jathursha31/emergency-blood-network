@@ -2,7 +2,6 @@ package com.blooddonor.security;
 
 import com.blooddonor.entity.AuditEvent;
 import com.blooddonor.repository.AuditEventRepository;
-import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -11,8 +10,6 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -43,7 +40,7 @@ public class AuditService {
         e.setAction(action);
         e.setTarget(cut(target, 60));
         e.setDetails(cut(details, 300));
-        e.setIp(clientIp());
+        e.setIp(RequestIp.current());
         events.save(e);
         log.info("AUDIT {} actor={} target={} {}", action, actor, target, details == null ? "" : details);
     }
@@ -58,15 +55,6 @@ public class AuditService {
     @Transactional(readOnly = true)
     public Page<AuditEvent> search(String user, AuditEvent.Action action, int page, int size) {
         return events.search(blankToNull(user), action, PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 200)));
-    }
-
-    /** Client IP of the current HTTP request (first X-Forwarded-For hop behind a proxy), or null outside a request. */
-    private static String clientIp() {
-        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs)) return null;
-        HttpServletRequest req = attrs.getRequest();
-        String forwarded = req.getHeader("X-Forwarded-For");
-        String ip = forwarded != null && !forwarded.isBlank() ? forwarded.split(",")[0].trim() : req.getRemoteAddr();
-        return cut(ip, 45);
     }
 
     private static String cut(String s, int max) {

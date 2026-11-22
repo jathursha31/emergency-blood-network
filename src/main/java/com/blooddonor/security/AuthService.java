@@ -43,6 +43,7 @@ public class AuthService {
     private final AuditService audit;
     private final Clock clock;
     private final RefreshTokenService refreshTokens;
+    private final LoginGuard loginGuard;
 
     public AuthService(UserAccountRepository accounts,
                        DonorService donorService,
@@ -55,8 +56,10 @@ public class AuthService {
                        OtpProperties otpProps,
                        AuditService audit,
                        Clock clock,
-                       RefreshTokenService refreshTokens) {
+                       RefreshTokenService refreshTokens,
+                       LoginGuard loginGuard) {
         this.refreshTokens = refreshTokens;
+        this.loginGuard = loginGuard;
         this.audit = audit;
         this.clock = clock;
         this.otpService = otpService;
@@ -72,17 +75,22 @@ public class AuthService {
 
     /** Password-less login for donors with a code sent to their registered mobile. */
     public TokenResponse loginWithOtp(String phone, String code) {
-        UserAccount account = accounts.findByUsername(phone.trim())
+        String username = phone.trim();
+        String ip = RequestIp.current();
+        loginGuard.checkAllowed(username, ip);
+        UserAccount account = accounts.findByUsername(username)
                 .filter(a -> a.isEnabled() && a.getRole() == Role.DONOR)
                 .orElse(null);
         if (account == null) {
-            audit.record(null, AuditEvent.Action.LOGIN_FAILED, phone.trim(), "OTP login: unknown or disabled account");
+            audit.record(null, AuditEvent.Action.LOGIN_FAILED, username, "OTP login: unknown or disabled account");
+            loginGuard.recordFailure(username, ip);
             throw new InvalidOtpException("Wrong code. Request a new one.");
         }
         try {
             otpService.verify(account.getUsername(), OtpCode.Purpose.LOGIN, code);
         } catch (InvalidOtpException e) {
             audit.record(null, AuditEvent.Action.LOGIN_FAILED, account.getUsername(), "OTP login: " + e.getMessage());
+            loginGuard.recordFailure(username, ip);
             throw e;
         }
         loggedIn(account, AuditEvent.Action.OTP_LOGIN);
@@ -91,9 +99,12 @@ public class AuthService {
 
     public TokenResponse login(LoginRequest req) {
         String username = req.username().trim();
+        String ip = RequestIp.current();
+        loginGuard.checkAllowed(username, ip); // 429 while locked, before even looking at the password
         UserAccount account = accounts.findByUsername(username).orElse(null);
         if (account == null || !passwordEncoder.matches(req.password(), account.getPasswordHash())) {
             audit.record(null, AuditEvent.Action.LOGIN_FAILED, username, account == null ? "unknown username" : "wrong password");
+            loginGuard.recordFailure(username, ip);
             throw new InvalidCredentialsException(); // same error for unknown user and wrong password
         }
         if (!account.isEnabled()) {
@@ -106,6 +117,7 @@ public class AuthService {
 
     private void loggedIn(UserAccount account, AuditEvent.Action how) {
         account.setLastLoginAt(LocalDateTime.now(clock));
+        loginGuard.recordSuccess(account);
         audit.record(account.getUsername(), how, account.getUsername(), null);
     }
 

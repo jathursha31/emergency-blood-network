@@ -24,7 +24,9 @@ public final class AdminDtos {
             boolean enabled,
             LocalDateTime createdAt,
             LocalDateTime lastLoginAt,
-            long activeSessions
+            long activeSessions,
+            /* set while the account is locked after too many failed logins */
+            LocalDateTime lockedUntil
     ) {
     }
 
