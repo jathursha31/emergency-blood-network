@@ -254,7 +254,7 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; backgr
 .chart { margin: 0; }
 .chart figcaption { font-weight: 700; margin-bottom: .4rem; }
 .chart-box { position: relative; }
-.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart svg { display: block; overflow: visible; max-width: 100%; }
 .chart .grid { stroke: #eef0f3; stroke-width: 1; }
 .chart .axis { stroke: #c9cdd4; stroke-width: 1; }
 .chart .tick { font-size: 11px; fill: var(--muted); }

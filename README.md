@@ -22,6 +22,13 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | Privacy | Hospitals see donor phones only after the donor accepts. Donors see the hospital phone only after accepting, and never see other donors. |
 | Reminders | Daily 9 AM job notifies donors whose 90-day wait ends today. |
 | Web app | Built-in frontend at `/` with donor, hospital and admin dashboards and Leaflet maps. |
+| Blood bank inventory | Units per blood group per hospital, with a minimum level. Falling below it automatically raises a restock request to nearby donors, and the units donated for it go back into stock. |
+| Donation camps | Hospitals run one-day camps with time slots. Eligible donors within 15 km are invited, book a slot (row lock prevents overbooking), get a QR pass, and are checked in on the day, which records the donation and adds a unit to stock. |
+| Live updates | Server-Sent Events (`/api/live`) push changes after commit: hospitals see accepts and bookings, donors see new requests, and accepted donors appear on the request map (~1 km precision). |
+| Donor rewards | Badges (First Drop 1, Bronze 3, Life Saver 5, Hero 10, Legend 25), "lives helped", and a public leaderboard showing short names only. |
+| Admin analytics | Fulfilment rate, average response and fulfilment time, demand vs supply per blood group, a 14-day trend, and per-hospital stats. |
+| OTP | Sign-up verifies the mobile with a 6-digit SMS code, and donors can log in with a code instead of a password. Codes are hashed, expire, are rate limited and allow 5 attempts. |
+| WhatsApp | `SMS_CHANNEL=whatsapp` sends the same notifications over Twilio WhatsApp. |
 | API docs | Swagger UI at `/swagger-ui.html`, with an **Authorize** button for the JWT. |
 
 ## Web frontend
@@ -163,8 +170,18 @@ These defaults are for local development only. Elsewhere, set the `JWT_SECRET` (
 
 | Method | Endpoint | Who | Purpose |
 |---|---|---|---|
-| POST | `/api/auth/register` | public | Donor sign-up, returns a token |
+| POST | `/api/auth/otp/request` | public | `{"phone","purpose":"REGISTER"|"LOGIN"}`: send a 6-digit code by SMS |
+| POST | `/api/auth/register` | public | Donor sign-up with `otpCode`, returns a token |
 | POST | `/api/auth/login` | public | Login, returns a token |
+| POST | `/api/auth/otp/login` | public | Donor login with `{"phone","code"}` instead of a password |
+| GET | `/api/live` | any logged in | Server-Sent Events stream of live updates |
+| GET | `/api/me/rewards` | DONOR | Badge, donations, lives helped, rank |
+| GET/POST | `/api/me/camp-bookings` (+ `/{id}/cancel`) | DONOR | My camp passes, book a slot |
+| GET | `/api/leaderboard` | public | Top donors (short names) |
+| GET | `/api/camps?lat=..&lng=..`, `/api/camps/{id}/slots` | public | Upcoming camps, free places per slot |
+| POST | `/api/camps`, GET `/api/camps/hosted`, `/{id}/bookings`, POST `/{id}/cancel`, `/check-in` | HOSPITAL, ADMIN | Run camps |
+| GET | `/api/inventory`, PUT `/{group}`, POST `/{group}/use`, `/{group}/add` | HOSPITAL (own), ADMIN (`?hospitalId=`) | Blood bank |
+| GET | `/api/inventory/overview`, `/api/admin/analytics` | ADMIN | All blood banks, analytics |
 | GET | `/api/auth/me` | any logged in | Who am I |
 | GET | `/api/me` | DONOR | My profile |
 | PATCH | `/api/me/availability` | DONOR | `{"available": false}` |
@@ -186,7 +203,7 @@ These defaults are for local development only. Elsewhere, set the `JWT_SECRET` (
 
 Blood group values: `O_NEG, O_POS, A_NEG, A_POS, B_NEG, B_POS, AB_NEG, AB_POS`.
 
-Status codes: `400` invalid input · `401` missing/invalid token or wrong password · `403` wrong role or not your data · `404` not found · `409` business rule (e.g. donor not eligible).
+Status codes: `400` invalid input · `401` missing/invalid token or wrong password · `403` wrong role or not your data · `404` not found · `409` business rule (e.g. donor not eligible) · `429` too many OTP requests.
 
 ### Full flow with curl (fresh database)
 
@@ -259,4 +276,6 @@ jobs.eligibility-reminder.cron=0 0 9 * * *
 - Refresh tokens and logout (token blacklist)
 - PostGIS `geography` column and `ST_DWithin` for very large donor tables
 - Flyway migrations instead of `ddl-auto=update`
-- WhatsApp notifications (Twilio supports them with the same API), and an Indian SMS gateway with DLT templates
+- An Indian SMS gateway with DLT templates (MSG91, Fast2SMS)
+- Scanning the camp QR pass with the phone camera at check-in
+- Analytics as SQL aggregate queries or a reporting table for large data

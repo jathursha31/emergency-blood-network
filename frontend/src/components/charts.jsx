@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 /*
  * Small dependency-free SVG charts.
@@ -48,9 +48,23 @@ function Legend({ series }) {
 /**
  * Grouped columns. data: [{ label, values: [n, n] }], series: [{ name }].
  */
-export function ColumnChart({ data, series, height = 200, title }) {
+/** Width of an element in CSS pixels, kept up to date (so SVG text stays 11px at any width). */
+function useWidth(fallback = 640) {
+    const ref = useRef(null);
+    const [width, setWidth] = useState(fallback);
+    useLayoutEffect(() => {
+        if (!ref.current) return undefined;
+        const ro = new ResizeObserver(([entry]) => setWidth(Math.max(240, Math.round(entry.contentRect.width))));
+        ro.observe(ref.current);
+        return () => ro.disconnect();
+    }, []);
+    return [ref, width];
+}
+
+export function ColumnChart({ data, series, height = 220, title }) {
     const [hover, setHover] = useState(null);
-    const W = 640, H = height, padL = 32, padB = 26, padT = 10;
+    const [boxRef, W] = useWidth();
+    const H = height, padL = 32, padB = 26, padT = 10;
     const max = Math.max(0, ...data.flatMap(d => d.values));
     const { top, step } = ticks(max);
     const innerW = W - padL - 4, innerH = H - padB - padT;
@@ -63,8 +77,8 @@ export function ColumnChart({ data, series, height = 200, title }) {
         <figure className="chart">
             {title && <figcaption>{title}</figcaption>}
             <Legend series={series} />
-            <div className="chart-box">
-                <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title}>
+            <div className="chart-box" ref={boxRef}>
+                <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title}>
                     {Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step).map(t => (
                         <g key={t}>
                             <line x1={padL} x2={W - 4} y1={y(t)} y2={y(t)} className={t === 0 ? 'axis' : 'grid'} />
@@ -74,7 +88,9 @@ export function ColumnChart({ data, series, height = 200, title }) {
                     {data.map((d, i) => {
                         const groupW = barW * series.length + gap * (series.length - 1);
                         const x0 = padL + i * band + (band - groupW) / 2;
-                        const showLabel = data.length <= 8 || i % 2 === (data.length - 1) % 2;
+                        // keep about 56px per date label so they never collide
+                        const every = Math.max(1, Math.ceil(56 / band));
+                        const showLabel = (data.length - 1 - i) % every === 0;
                         return (
                             <g key={d.label}>
                                 {hover === i && <rect x={padL + i * band} y={padT} width={band} height={innerH} className="hover-band" />}
