@@ -3,6 +3,8 @@ package com.blooddonor.service;
 import com.blooddonor.dto.InventoryDtos.*;
 import com.blooddonor.entity.*;
 import com.blooddonor.exception.BusinessRuleException;
+import com.blooddonor.live.LiveEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import com.blooddonor.repository.BloodRequestRepository;
 import com.blooddonor.repository.BloodStockRepository;
 import com.blooddonor.repository.HospitalRepository;
@@ -35,10 +37,12 @@ public class InventoryService {
     private final BloodRequestService requestService;
     private final HospitalService hospitalService;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public InventoryService(BloodStockRepository stockRepository, HospitalRepository hospitalRepository,
                             BloodRequestRepository requestRepository, BloodRequestService requestService,
-                            HospitalService hospitalService, Clock clock) {
+                            HospitalService hospitalService, Clock clock, ApplicationEventPublisher events) {
+        this.events = events;
         this.stockRepository = stockRepository;
         this.hospitalRepository = hospitalRepository;
         this.requestRepository = requestRepository;
@@ -131,6 +135,8 @@ public class InventoryService {
 
     private void touch(BloodStock s) {
         s.setUpdatedAt(LocalDateTime.now(clock));
+        events.publishEvent(LiveEvent.toHospital("inventory.updated", s.getHospital().getId(),
+                Map.of("bloodGroup", s.getBloodGroup().name(), "units", s.getUnits())));
     }
 
     private StockView toView(BloodStock s) {

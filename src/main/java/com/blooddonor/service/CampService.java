@@ -6,6 +6,7 @@ import com.blooddonor.entity.*;
 import com.blooddonor.exception.BusinessRuleException;
 import com.blooddonor.exception.ForbiddenException;
 import com.blooddonor.exception.NotFoundException;
+import com.blooddonor.live.LiveEvent;
 import com.blooddonor.repository.CampBookingRepository;
 import com.blooddonor.repository.DonationCampRepository;
 import com.blooddonor.repository.DonorRepository;
@@ -123,6 +124,7 @@ public class CampService {
                         + "' on " + camp.getCampDate().format(DAY) + " has been cancelled.");
             }
         }
+        campChanged(camp, null);
         return toView(camp, null, null);
     }
 
@@ -149,6 +151,7 @@ public class CampService {
                 "camp #" + camp.getId()));
         notifier.send(donor.getPhone(), "Thank you for donating at " + camp.getName()
                 + "! You can donate again in 90 days.");
+        campChanged(camp, "✅ " + donor.getFullName() + " checked in at " + camp.getName());
         return toRow(b);
     }
 
@@ -197,6 +200,7 @@ public class CampService {
         bookingRepository.save(b);
         notifier.send(donor.getPhone(), "Booked: " + camp.getName() + " on " + camp.getCampDate().format(DAY)
                 + " at " + req.slotTime() + ". Your check-in code is " + b.getCode() + ".");
+        campChanged(camp, "🎟️ New booking for " + camp.getName() + " at " + req.slotTime());
         return toMine(b);
     }
 
@@ -209,6 +213,7 @@ public class CampService {
         if (!b.getDonor().getId().equals(donorId)) throw new ForbiddenException("Not your booking");
         if (b.getStatus() != CampBooking.Status.BOOKED) throw new BusinessRuleException("Booking is " + b.getStatus());
         b.setStatus(CampBooking.Status.CANCELLED);
+        campChanged(b.getCamp(), null);
         return toMine(b);
     }
 
@@ -223,7 +228,18 @@ public class CampService {
                     + camp.getCampDate().format(DAY) + " " + camp.getStartTime() + "-" + camp.getEndTime()
                     + " (" + GeoUtils.round1(m.distanceKm()) + " km away). Book a slot in the app.");
         }
+        Set<Long> donorIds = donors.stream().map(m -> m.donor().getId()).collect(Collectors.toSet());
+        if (!donorIds.isEmpty()) {
+            events.publishEvent(new LiveEvent("camp.created", Set.of(), donorIds,
+                    Map.of("campId", camp.getId(), "message", "⛺ New donation camp near you: " + camp.getName())));
+        }
         return donors.size();
+    }
+
+    private void campChanged(DonationCamp camp, String message) {
+        Map<String, Object> data = new java.util.HashMap<>(Map.of("campId", camp.getId()));
+        if (message != null) data.put("message", message);
+        events.publishEvent(LiveEvent.toHospital("camp.updated", camp.getHospital().getId(), data));
     }
 
     private String newCode() {

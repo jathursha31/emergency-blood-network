@@ -1,11 +1,13 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { useLiveStatus } from '../hooks/live';
 
 const ROLE_NAME = { DONOR: 'Donor', HOSPITAL: 'Hospital', ADMIN: 'Admin' };
 
 export default function Topbar() {
     const { session, logout } = useAuth();
     const navigate = useNavigate();
+    const live = useLiveStatus();
 
     return (
         <header className="topbar">
@@ -15,6 +17,9 @@ export default function Topbar() {
             </div>
             {session && (
                 <div className="userbox">
+                    <span className={`live-dot ${live ? 'on' : ''}`}
+                          title={live ? 'Live updates on' : 'Reconnecting… (data still refreshes every 20 s)'}>
+                        {live ? 'Live' : 'Offline'}</span>
                     <span><b>{session.displayName}</b> · {ROLE_NAME[session.role]}</span>
                     <button className="btn secondary small" onClick={() => { logout(); navigate('/login'); }}>Log out</button>
                 </div>

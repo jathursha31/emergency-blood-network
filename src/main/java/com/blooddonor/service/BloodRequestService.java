@@ -9,6 +9,7 @@ import com.blooddonor.dto.DonorDtos.Eligibility;
 import com.blooddonor.entity.*;
 import com.blooddonor.exception.BusinessRuleException;
 import com.blooddonor.exception.NotFoundException;
+import com.blooddonor.live.LiveEvent;
 import com.blooddonor.repository.BloodRequestRepository;
 import com.blooddonor.repository.DonorRepository;
 import com.blooddonor.repository.DonorResponseRepository;
@@ -24,7 +25,9 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -107,6 +110,7 @@ public class BloodRequestService {
         log.info("Request #{} ({} {} units) created, {} donors notified within {} km",
                 request.getId(), request.getBloodGroup().label(), request.getUnitsNeeded(),
                 notified, request.getSearchRadiusKm());
+        live("request.created", request, notified + " donor(s) notified for request #" + request.getId());
         return toView(request);
     }
 
@@ -197,6 +201,7 @@ public class BloodRequestService {
             request.setStatus(RequestStatus.MATCHED);
             log.info("Request #{} is now MATCHED", request.getId());
         }
+        live("request.updated", request, "✅ " + donor.getFullName() + " accepted request #" + request.getId());
         return toView(request);
     }
 
@@ -220,6 +225,7 @@ public class BloodRequestService {
             log.info("Request #{} reopened after a donor backed out, {} new donors notified",
                     request.getId(), notified);
         }
+        live("request.updated", request, response.getDonor().getFullName() + " declined request #" + request.getId());
         return toView(request);
     }
 
@@ -250,6 +256,7 @@ public class BloodRequestService {
         } else if (committedDonors(request) >= request.getUnitsNeeded()) {
             request.setStatus(RequestStatus.MATCHED);
         }
+        live("request.updated", request, null);
         return toView(request);
     }
 
@@ -261,6 +268,7 @@ public class BloodRequestService {
         close(request, RequestStatus.CANCELLED,
                 "Request #" + request.getId() + " at " + request.getHospital().getName()
                         + " was cancelled. No need to come. Thank you!");
+        live("request.updated", request, null);
         return toView(request);
     }
 
@@ -276,6 +284,8 @@ public class BloodRequestService {
             int notified = notifyNewDonors(request);
             log.info("Request #{}: radius {} -> {} km, {} new donors notified",
                     request.getId(), oldRadius, request.getSearchRadiusKm(), notified);
+            live("request.updated", request, notified > 0 ? "Search for request #" + request.getId()
+                    + " widened to " + request.getSearchRadiusKm() + " km, " + notified + " more donor(s) notified" : null);
         }
         return stale.size();
     }
@@ -288,6 +298,7 @@ public class BloodRequestService {
             notifier.send(request.getHospital().getPhone(),
                     "Request #" + request.getId() + " expired with " + request.countResponses(ResponseStatus.DONATED)
                             + "/" + request.getUnitsNeeded() + " units donated.");
+            live("request.updated", request, "Request #" + request.getId() + " expired");
         }
         return overdue.size();
     }
@@ -360,6 +371,20 @@ public class BloodRequestService {
         return LocalDateTime.now(clock);
     }
 
+    /**
+     * Tell open screens about a change (sent after commit). The hospital gets a readable message;
+     * donors only get ids and status, never other donors' names.
+     */
+    private void live(String type, BloodRequest r, String hospitalMessage) {
+        Map<String, Object> base = Map.of("requestId", r.getId(), "status", r.getStatus().name());
+        Map<String, Object> forHospital = new HashMap<>(base);
+        if (hospitalMessage != null) forHospital.put("message", hospitalMessage);
+        events.publishEvent(new LiveEvent(type, Set.of(r.getHospital().getId()), Set.of(), forHospital));
+
+        Set<Long> donorIds = r.getResponses().stream().map(x -> x.getDonor().getId()).collect(Collectors.toSet());
+        if (!donorIds.isEmpty()) events.publishEvent(new LiveEvent(type, Set.of(), donorIds, base));
+    }
+
     private BloodRequestView toView(BloodRequest r) {
         List<ResponseView> donors = r.getResponses().stream()
                 .sorted(Comparator.comparingInt((DonorResponse resp) -> displayRank(resp.getStatus()))
@@ -401,6 +426,8 @@ public class BloodRequestService {
         boolean revealPhone = resp.getStatus() == ResponseStatus.ACCEPTED || resp.getStatus() == ResponseStatus.DONATED;
         return new ResponseView(d.getId(), d.getFullName(), d.getBloodGroup(), GeoUtils.round1(resp.getDistanceKm()),
                 resp.getStatus(), revealPhone ? d.getPhone() : DonorService.maskPhone(d.getPhone()),
-                resp.getNotifiedAt(), resp.getRespondedAt(), resp.getDonatedAt());
+                resp.getNotifiedAt(), resp.getRespondedAt(), resp.getDonatedAt(),
+                revealPhone ? Math.round(d.getLatitude() * 100) / 100.0 : null,
+                revealPhone ? Math.round(d.getLongitude() * 100) / 100.0 : null);
     }
 }

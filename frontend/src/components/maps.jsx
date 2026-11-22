@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import L from 'leaflet';
-import { Circle, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -37,7 +37,7 @@ function FitTo({ points, circle }) {
  * Hospitals as red "H" markers, with an optional search-radius circle around the first one.
  * hospitals: [{ id, name, latitude, longitude }]
  */
-export function HospitalMap({ hospitals, radiusKm, tall }) {
+export function HospitalMap({ hospitals, radiusKm, tall, donors = [] }) {
     const points = useMemo(() => hospitals.map(h => [h.latitude, h.longitude]), [hospitals]);
     const circle = radiusKm && points.length ? { center: points[0], radiusKm } : null;
     return (
@@ -47,6 +47,13 @@ export function HospitalMap({ hospitals, radiusKm, tall }) {
                 <Marker key={h.id} position={[h.latitude, h.longitude]} icon={hospitalIcon}>
                     <Popup>{h.name}</Popup>
                 </Marker>
+            ))}
+            {/* donors who accepted, at their approximate (~1 km) location */}
+            {donors.map(d => (
+                <CircleMarker key={d.id} center={[d.lat, d.lng]} radius={9}
+                              pathOptions={{ color: '#fff', weight: 2, fillColor: d.donated ? '#15803d' : '#22c55e', fillOpacity: 1 }}>
+                    <Popup>{d.name} · {d.status.toLowerCase()} · ~{d.distanceKm} km</Popup>
+                </CircleMarker>
             ))}
             {circle && <Circle center={circle.center} radius={radiusKm * 1000}
                                pathOptions={{ color: '#d62839', weight: 1.5, fillOpacity: 0.07 }} />}

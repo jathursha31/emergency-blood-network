@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { campApi } from '../api/client';
+import { useLiveEvents } from '../hooks/live';
 import { usePolling } from '../hooks/usePolling';
 import { LocationPicker } from './maps';
 import { useToast } from './Toast';
@@ -140,6 +141,11 @@ export function MyCampBookings({ refreshKey }) {
 export function CampsForHospital({ hospital }) {
     const { data: camps, error, reload } = usePolling(campApi.hosted, 30000);
     const [selected, setSelected] = useState(null);
+    const toast = useToast();
+    useLiveEvents((evt) => {
+        if (evt.data?.message && !evt.data.message.startsWith('✅')) toast(evt.data.message, 'ok');
+        reload();
+    }, ['camp.']);
     const current = camps?.find(c => c.id === selected);
 
     return (

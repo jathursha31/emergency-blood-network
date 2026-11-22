@@ -5,6 +5,7 @@ import { HospitalMap, LocationPicker } from '../components/maps';
 import { RequestForm, RequestsPanel } from '../components/requests';
 import { useToast } from '../components/Toast';
 import { Empty, readForm } from '../components/ui';
+import { useLiveEvents } from '../hooks/live';
 import { usePolling } from '../hooks/usePolling';
 
 export default function AdminDashboard() {
@@ -36,6 +37,7 @@ const ADMIN_TABS = [['requests', '🚨 Blood requests'], ['banks', '🏦 Blood b
 function AdminRequests({ hospitals }) {
     const [selectedId, setSelectedId] = useState(null);
     const { data: requests, error, reload } = usePolling(requestApi.list);
+    useLiveEvents(() => reload(), ['request.']);
 
     return (
         <div className="grid grid-side">

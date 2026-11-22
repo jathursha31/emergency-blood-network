@@ -7,6 +7,7 @@ import { HospitalMap } from '../components/maps';
 import { RequestForm, RequestsPanel } from '../components/requests';
 import { useToast } from '../components/Toast';
 import { Empty } from '../components/ui';
+import { useLiveEvents } from '../hooks/live';
 import { usePolling } from '../hooks/usePolling';
 
 const TABS = [['requests', '🚨 Requests'], ['bank', '🏦 Blood bank'], ['camps', '⛺ Camps']];
@@ -18,6 +19,11 @@ export default function HospitalDashboard() {
     const [hospital, setHospital] = useState(null);
     const [selectedId, setSelectedId] = useState(null);
     const { data: requests, error, reload } = usePolling(requestApi.list);
+
+    useLiveEvents((evt) => {
+        if (evt.type === 'request.updated' && evt.data?.message) toast(evt.data.message, 'ok');
+        reload();
+    }, ['request.']);
 
     useEffect(() => {
         hospitalApi.get(session.hospitalId).then(setHospital).catch(e => toast(e.message, 'error'));

@@ -4,6 +4,7 @@ import { CampsForDonor, MyCampBookings } from '../components/camps';
 import { Leaderboard, RewardsCard } from '../components/rewards';
 import { useToast } from '../components/Toast';
 import { AsyncButton, Badge, BloodDrop, Empty } from '../components/ui';
+import { useLiveEvents } from '../hooks/live';
 import { usePolling } from '../hooks/usePolling';
 import { fmtDate, fmtDateTime, isActiveRequest, timeLeft } from '../utils/format';
 
@@ -19,6 +20,13 @@ export default function DonorDashboard() {
     const { data, error, loading, reload } = usePolling(loadDonorData);
     const [tab, setTab] = useState('requests');
     const [bookingsVersion, setBookingsVersion] = useState(0);
+    const toast = useToast();
+
+    useLiveEvents((evt) => {
+        if (evt.type === 'request.created') toast('🚨 New blood request near you. Can you help?', 'ok');
+        if (evt.type === 'camp.created' && evt.data?.message) toast(evt.data.message, 'ok');
+        reload();
+    }, ['request.', 'camp.']);
 
     if (loading) return <Empty>Loading…</Empty>;
     if (!data) return <Empty>{error?.message || 'Could not load your data.'}</Empty>;

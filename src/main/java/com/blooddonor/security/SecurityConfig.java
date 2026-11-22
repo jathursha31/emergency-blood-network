@@ -2,6 +2,7 @@ package com.blooddonor.security;
 
 import com.blooddonor.controller.SpaController;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -39,6 +40,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // no cookies/sessions, so CSRF does not apply
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // The live stream (/api/live) was already authorized on the original request;
+                        // its later async dispatches carry no fresh JWT check.
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         // public: web frontend (static files) and API docs
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**").permitAll()
                         .requestMatchers(HttpMethod.GET, SpaController.ROUTES).permitAll()

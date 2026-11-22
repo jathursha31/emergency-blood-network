@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { inventoryApi } from '../api/client';
+import { useLiveEvents } from '../hooks/live';
 import { usePolling } from '../hooks/usePolling';
 import { useToast } from './Toast';
 import { Empty } from './ui';
@@ -15,6 +16,7 @@ const LEVEL = {
 export function BloodBank({ hospitalId, onRequestCreated }) {
     const { data: stock, error, reload } = usePolling(() => inventoryApi.list(hospitalId), 30000);
     const [editing, setEditing] = useState(null);
+    useLiveEvents(() => reload(), ['inventory.']);
 
     if (!stock) return <section className="card"><Empty>{error ? error.message : 'Loading…'}</Empty></section>;
 

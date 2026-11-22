@@ -80,7 +80,10 @@ public final class RequestDtos {
             String phone,
             LocalDateTime notifiedAt,
             LocalDateTime respondedAt,
-            LocalDateTime donatedAt
+            LocalDateTime donatedAt,
+            /* rounded to ~1 km, only once the donor has accepted (for the live map) */
+            Double approxLatitude,
+            Double approxLongitude
     ) {
     }
 }

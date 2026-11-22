@@ -179,7 +179,13 @@ export function RequestDetail({ r, hospital, onClose, onChanged }) {
                 {r.closedAt && ` · closed ${fmtDateTime(r.closedAt)}`}
             </p>
 
-            {hospital && <HospitalMap hospitals={[hospital]} radiusKm={r.searchRadiusKm} />}
+            {hospital && <HospitalMap hospitals={[hospital]} radiusKm={r.searchRadiusKm}
+                donors={r.donors.filter(d => d.approxLatitude != null).map(d => ({
+                    id: d.donorId, lat: d.approxLatitude, lng: d.approxLongitude, name: d.donorName,
+                    status: d.status, donated: d.status === 'DONATED', distanceKm: d.distanceKm,
+                }))} />}
+            {hospital && r.donors.some(d => d.approxLatitude != null) &&
+                <p className="hint">🟢 Donors on their way (approximate location, ~1 km). Updates live.</p>}
 
             <h3 style={{ marginTop: '1rem' }}>Donors</h3>
             {r.donors.length ? (
