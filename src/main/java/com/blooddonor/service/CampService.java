@@ -7,6 +7,7 @@ import com.blooddonor.exception.BusinessRuleException;
 import com.blooddonor.exception.ForbiddenException;
 import com.blooddonor.exception.NotFoundException;
 import com.blooddonor.live.LiveEvent;
+import com.blooddonor.push.PushMessage;
 import com.blooddonor.repository.CampBookingRepository;
 import com.blooddonor.repository.DonationCampRepository;
 import com.blooddonor.repository.DonorRepository;
@@ -232,6 +233,10 @@ public class CampService {
         if (!donorIds.isEmpty()) {
             events.publishEvent(new LiveEvent("camp.created", Set.of(), donorIds,
                     Map.of("campId", camp.getId(), "message", "⛺ New donation camp near you: " + camp.getName())));
+            events.publishEvent(new PushMessage(donorIds, "⛺ Blood donation camp near you",
+                    camp.getName() + ", " + camp.getCampDate().format(DAY) + " " + camp.getStartTime() + "-"
+                            + camp.getEndTime() + ". Tap to book a slot.",
+                    "/donor?tab=camps", "camp-" + camp.getId(), false));
         }
         return donors.size();
     }

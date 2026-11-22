@@ -163,6 +163,14 @@ export const hospitalApi = {
     create: (body) => api('POST', '/api/hospitals', body),
 };
 
+export const pushApi = {
+    publicKey: () => api('GET', '/api/push/vapid-public-key'),
+    devices: () => api('GET', '/api/me/push-subscriptions'),
+    subscribe: (subscription) => api('POST', '/api/me/push-subscriptions', subscription),
+    unsubscribe: (endpoint) => api('DELETE', '/api/me/push-subscriptions', { endpoint }),
+    test: () => api('POST', '/api/me/push-subscriptions/test'),
+};
+
 export const publicApi = {
     compatibility: (group) => api('GET', `/api/blood-groups/${group}`),
     leaderboard: (limit = 10) => api('GET', `/api/leaderboard?limit=${limit}`),

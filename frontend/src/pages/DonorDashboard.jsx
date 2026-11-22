@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { donorApi } from '../api/client';
 import { CampsForDonor, MyCampBookings } from '../components/camps';
+import PushAlerts from '../components/PushAlerts';
 import { Leaderboard, RewardsCard } from '../components/rewards';
 import { useToast } from '../components/Toast';
 import { AsyncButton, Badge, BloodDrop, Empty } from '../components/ui';
@@ -18,7 +20,8 @@ const TABS = [['requests', '🚨 Requests'], ['camps', '⛺ Camps'], ['leaderboa
 
 export default function DonorDashboard() {
     const { data, error, loading, reload } = usePolling(loadDonorData);
-    const [tab, setTab] = useState('requests');
+    const [params] = useSearchParams();   // ?tab=camps when opened from a camp notification
+    const [tab, setTab] = useState(TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'requests');
     const [bookingsVersion, setBookingsVersion] = useState(0);
     const toast = useToast();
 
@@ -37,6 +40,7 @@ export default function DonorDashboard() {
         <div className="grid grid-side">
             <div className="stack">
                 <ProfileCard me={data.me} eligibility={data.eligibility} reload={reload} />
+                <PushAlerts />
                 <RewardsCard rewards={data.rewards} />
                 <section className="card">
                     <h2>My donations</h2>

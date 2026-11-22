@@ -10,6 +10,7 @@ import com.blooddonor.entity.*;
 import com.blooddonor.exception.BusinessRuleException;
 import com.blooddonor.exception.NotFoundException;
 import com.blooddonor.live.LiveEvent;
+import com.blooddonor.push.PushMessage;
 import com.blooddonor.repository.BloodRequestRepository;
 import com.blooddonor.repository.DonorRepository;
 import com.blooddonor.repository.DonorResponseRepository;
@@ -328,6 +329,16 @@ public class BloodRequestService {
                     "[" + request.getUrgency() + "] " + request.getBloodGroup().label() + " blood needed at "
                             + hospital.getName() + " (" + GeoUtils.round1(match.distanceKm()) + " km away). "
                             + "Request #" + request.getId() + ". Please accept or decline in the app.");
+        }
+        if (!matches.isEmpty()) {
+            events.publishEvent(new PushMessage(
+                    matches.stream().map(m -> m.donor().getId()).collect(Collectors.toSet()),
+                    (request.getUrgency() == Urgency.CRITICAL ? "🚨 " : "🩸 ") + request.getBloodGroup().label()
+                            + " blood needed nearby",
+                    hospital.getName() + " needs " + request.getUnitsNeeded() + " unit(s)"
+                            + (request.getUrgency() == Urgency.NORMAL ? "" : " (" + request.getUrgency() + ")")
+                            + ". Tap to accept or decline.",
+                    "/donor", "request-" + request.getId(), request.getUrgency() != Urgency.NORMAL));
         }
         request.setLastSearchAt(now());
         return matches.size();

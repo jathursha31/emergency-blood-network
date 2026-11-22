@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { disablePush } from '../pwa';
 import { authApi, donorApi, hospitalApi, setRefreshedHandler, setToken, setUnauthorizedHandler } from '../api/client';
 
 const STORAGE_KEY = 'bdn.session';
@@ -43,12 +44,14 @@ export function AuthProvider({ children }) {
 
     /** Log out on this device: the server revokes the refresh cookie too. */
     const logout = useCallback(async () => {
+        await disablePush().catch(() => {});
         await authApi.logout();
         endSession();
     }, [endSession]);
 
     /** Log out on every device where this account is signed in. Returns how many sessions were closed. */
     const logoutEverywhere = useCallback(async () => {
+        await disablePush().catch(() => {});
         const res = await authApi.logoutAll();
         endSession();
         return res.sessionsClosed;

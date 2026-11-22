@@ -46,7 +46,8 @@ public class SecurityConfig {
                         // its later async dispatches carry no fresh JWT check.
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         // public: web frontend (static files) and API docs
-                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**", "/icons/**",
+                                "/manifest.webmanifest", "/sw.js", "/offline.html", "/api/push/vapid-public-key").permitAll()
                         .requestMatchers(HttpMethod.GET, SpaController.ROUTES).permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",

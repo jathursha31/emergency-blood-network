@@ -33,6 +33,7 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | User management | Admins search accounts (last login, active sessions), **disable** one (logged out everywhere at once; the last admin and your own account are protected), enable it again, or **reset a password** (a random temporary password shown once). Anyone can change their own password, which logs out their other devices. |
 | Audit log | Append-only record of logins, failed logins (with reason and IP), OTP logins, logouts, token-theft detection, password changes and resets, disables and enables, sign-ups and new hospitals. Each entry is written in its own transaction, so failures are recorded too. Filterable in the admin UI. |
 | OTP | Sign-up verifies the mobile with a 6-digit SMS code, and donors can log in with a code instead of a password. Codes are hashed, expire, are rate limited and allow 5 attempts. |
+| Mobile app (PWA) | Installable on Android, iPhone and desktop ("📲 Install app"), with an offline page when there is no signal. Donors can turn on **push notifications**: a nearby blood request or camp invite pops up on the phone even when the app is closed. Web Push is built with JDK crypto only (VAPID / RFC 8292, payload encryption / RFC 8291, checked against the RFC test vector). Logging out stops alerts on that device. |
 | WhatsApp | `SMS_CHANNEL=whatsapp` sends the same notifications over Twilio WhatsApp. |
 | API docs | Swagger UI at `/swagger-ui.html`, with an **Authorize** button for the JWT. |
 
@@ -202,6 +203,9 @@ These defaults are for local development only. Elsewhere, set the `JWT_SECRET` (
 | GET | `/api/me/requests` | DONOR | Requests I was notified about |
 | POST | `/api/me/requests/{id}/accept` | DONOR | Accept |
 | POST | `/api/me/requests/{id}/decline` | DONOR | Decline / back out |
+| GET | `/api/push/vapid-public-key` | public | Server key the browser subscribes with |
+| GET/POST/DELETE | `/api/me/push-subscriptions` | DONOR | Devices with alerts on / add this browser `{"endpoint","keys":{"p256dh","auth"}}` / remove it `{"endpoint"}` |
+| POST | `/api/me/push-subscriptions/test` | DONOR | Send a test alert to my devices |
 | POST | `/api/requests` | HOSPITAL, ADMIN | Raise an emergency request (auto-notifies donors) |
 | GET | `/api/requests?status=OPEN` | HOSPITAL (own), ADMIN (all) | List requests |
 | GET | `/api/requests/{id}` | owner HOSPITAL, ADMIN | Request with donor responses |
@@ -297,10 +301,19 @@ app.security.cookie-secure=false      # set COOKIE_SECURE=true when served over 
 app.security.max-failed-logins=5
 app.security.lock-minutes=15
 app.security.max-failed-logins-per-ip=20
+app.push.subject=mailto:admin@blooddonor.local   # PUSH_SUBJECT: contact for push services
 jobs.expand-search.cron=0 */5 * * * *
 jobs.eligibility-reminder.cron=0 0 9 * * *
 jobs.refresh-token-cleanup.cron=0 30 3 * * *
 ```
+
+## Mobile app and push notifications
+
+- **Install:** open the site on a phone. Chrome/Edge show "📲 Install app" in the top bar; on iPhone use Share → Add to Home Screen.
+- **Alerts:** a donor taps **🔔 Turn on alerts** on their dashboard and allows notifications. "Send test alert" checks it works.
+- The server generates its VAPID key pair on first use and keeps it in the `app_settings` table. Don't delete it: every browser subscribed with that key.
+- Push and service workers need **https** (or `localhost`). Dead subscriptions are removed automatically.
+- The service worker is registered only in the production build (`npm run build`), not in `npm run dev`.
 
 ## Ideas to extend
 

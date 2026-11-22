@@ -292,3 +292,39 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; backgr
 tr.row-disabled td { opacity: .6; }
 .tabs { overflow-x: auto; }
 .tab { white-space: nowrap; }
+
+/* ---------- PWA: alerts card, install button, small-screen menu ---------- */
+.push-card { display: grid; gap: .75rem; }
+.push-card.on { border-color: #b7e4c7; }
+.push-head { display: flex; gap: .75rem; align-items: flex-start; }
+.push-head h2 { margin: 0 0 .2rem; }
+.push-head p { margin: 0; }
+.push-icon { font-size: 1.6rem; line-height: 1; }
+.push-actions { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+
+.userbox .wide-only { display: flex; align-items: center; gap: .75rem; }
+.narrow-only { display: none; }
+.menu { position: relative; }
+.menu-btn { font-size: 1.1rem; line-height: 1; padding: .4rem .65rem; min-width: 40px; min-height: 40px; }
+.menu-list {
+    position: absolute; right: 0; top: calc(100% + .4rem); min-width: 230px; z-index: 1100;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,.15);
+    padding: .35rem; display: grid;
+}
+.menu-list button {
+    background: none; border: 0; text-align: left; padding: .75rem .8rem; border-radius: 8px;
+    font: inherit; color: var(--ink); cursor: pointer;
+}
+.menu-list button:hover, .menu-list button:focus-visible { background: var(--bg); }
+.menu-who { display: grid; padding: .55rem .8rem .65rem; border-bottom: 1px solid var(--line); margin-bottom: .25rem; }
+.menu-who span { color: var(--muted); font-size: .82rem; }
+
+@media (max-width: 760px) {
+    .userbox .wide-only, .userbox .who { display: none; }
+    .narrow-only { display: block; }
+    .userbox { gap: .5rem; }
+}
+
+/* installed app: respect the phone's notch / home bar */
+.topbar { padding-top: max(.6rem, env(safe-area-inset-top)); }
+body { padding-bottom: env(safe-area-inset-bottom); }
