@@ -2,7 +2,7 @@ package com.blooddonor.service;
 
 /**
  * Sends messages to donors / hospitals.
- * The default implementation only logs; plug in an SMS / WhatsApp / email provider here.
+ * Implemented by {@link com.blooddonor.notification.SmsNotificationService}: logs by default, real SMS via Twilio.
  */
 public interface NotificationService {
 

@@ -35,6 +35,25 @@ class BloodDonorNetworkApplicationTests {
     }
 
     @Test
+    void webFrontendIsServedWithoutToken() throws Exception {
+        HttpResponse<String> page = call("GET", "/", null, null);
+        assertThat(page.statusCode()).isEqualTo(200);
+        assertThat(page.body()).contains("Blood Donor Network", "<div id=\"root\">");
+
+        // the React bundle referenced by index.html (file names are hashed by Vite)
+        Matcher script = Pattern.compile("src=\"(/assets/[^\"]+\\.js)\"").matcher(page.body());
+        assertThat(script.find()).isTrue();
+        assertThat(call("GET", script.group(1), null, null).statusCode()).isEqualTo(200);
+
+        // React Router URLs opened directly get the same index.html
+        for (String route : new String[]{"/login", "/donor", "/hospital", "/admin"}) {
+            HttpResponse<String> r = call("GET", route, null, null);
+            assertThat(r.statusCode()).as(route).isEqualTo(200);
+            assertThat(r.body()).as(route).contains("<div id=\"root\">");
+        }
+    }
+
+    @Test
     void securedEndpointsRejectMissingOrBadTokens() throws Exception {
         assertThat(call("GET", "/api/requests", null, null).statusCode()).isEqualTo(401);
         assertThat(call("GET", "/api/requests", null, "not.a.real.token").statusCode()).isEqualTo(401);

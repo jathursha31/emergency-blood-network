@@ -1,5 +1,6 @@
 package com.blooddonor.security;
 
+import com.blooddonor.controller.SpaController;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,7 +39,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // no cookies/sessions, so CSRF does not apply
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // public
+                        // public: web frontend (static files) and API docs
+                        .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, SpaController.ROUTES).permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/blood-groups/**", "/api/donors/nearby").permitAll()

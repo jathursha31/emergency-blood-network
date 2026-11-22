@@ -7,3 +7,5 @@ target/
 Dockerfile
 compose.yaml
 README.md
+# The React build is already in src/main/resources/static; the frontend sources aren't needed in the image
+frontend/

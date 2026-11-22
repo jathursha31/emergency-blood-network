@@ -21,7 +21,43 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | Auto radius expansion | `@Scheduled` job: if an OPEN request gets no luck for 30 min, the radius grows 10 → 20 → … → 50 km and newly reached donors are notified. CRITICAL requests start at 20 km. |
 | Privacy | Hospitals see donor phones only after the donor accepts. Donors see the hospital phone only after accepting, and never see other donors. |
 | Reminders | Daily 9 AM job notifies donors whose 90-day wait ends today. |
+| Web app | Built-in frontend at `/` with donor, hospital and admin dashboards and Leaflet maps. |
 | API docs | Swagger UI at `/swagger-ui.html`, with an **Authorize** button for the JWT. |
+
+## Web frontend
+
+A **React 19** app (Vite, React Router, react-leaflet) lives in [`frontend/`](frontend).
+Its production build goes into `src/main/resources/static`, so Spring Boot serves it at **http://localhost:8080/**.
+
+```
+frontend/src
+├── main.jsx, App.jsx          routes + role guard (RequireRole)
+├── api/client.js              fetch wrapper: JWT header, error messages, one helper per endpoint
+├── auth/AuthContext.jsx       login/register/logout, session kept in localStorage
+├── hooks/usePolling.js        load data and refresh every 20 s
+├── components/                maps (Leaflet), request list/detail/form, toast, badges
+└── pages/                     AuthPage, DonorDashboard, HospitalDashboard, AdminDashboard
+```
+
+**Working on the frontend** (Node.js 20+ needed), with Spring Boot running on :8080:
+
+```bash
+cd frontend
+npm install
+npm run dev      # http://localhost:5173 with hot reload; /api is proxied to :8080
+npm run build    # writes the bundle into ../src/main/resources/static
+```
+
+Only run `npm run build` again when you change the frontend. Otherwise `./mvnw spring-boot:run` alone serves the last build.
+
+| Screen | What you can do |
+|---|---|
+| Login / sign-up | Log in (demo account buttons included), register as a donor by picking your location on a map, check blood-group compatibility |
+| Donor | Eligibility countdown, availability switch, nearby requests with **I can donate / Decline**, hospital phone after accepting, donation history |
+| Hospital | Raise an emergency request, filter requests, see the search radius on a map, see donors and their responses, **Mark donated**, cancel |
+| Admin | Every request across hospitals (and raise one for any hospital), add hospitals with a map location picker and a staff login |
+
+Lists refresh automatically every 20 seconds. Maps use OpenStreetMap tiles via Leaflet, loaded from the internet.
 
 ## Roles
 
@@ -34,7 +70,9 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 
 ## Tech stack
 
-Java 21 · Spring Boot 4.1 · Spring Security (OAuth2 resource server, JWT) · Spring Data JPA (Hibernate) · PostgreSQL · Bean Validation · springdoc-openapi · Docker / Docker Compose · JUnit 5 + H2 for tests
+**Backend:** Java 21 · Spring Boot 4.1 · Spring Security (OAuth2 resource server, JWT) · Spring Data JPA (Hibernate) · PostgreSQL · Bean Validation · springdoc-openapi · Docker / Docker Compose · JUnit 5 + H2 for tests
+
+**Frontend:** React 19 · Vite · React Router · Leaflet / react-leaflet (OpenStreetMap)
 
 ## Project structure
 
@@ -59,13 +97,14 @@ With [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed
 docker compose up --build
 ```
 
-This builds the API image (multi-stage: JDK to build, JRE to run, non-root user) and starts it with PostgreSQL 18.
-The first build downloads dependencies and takes a few minutes. Then open **http://localhost:8080/swagger-ui.html**
-and log in with the demo accounts below.
+This builds the app image (multi-stage: JDK to build, JRE to run, non-root user) and starts it with PostgreSQL 18.
+The first build downloads dependencies and takes a few minutes. Then open **http://localhost:8080** (web app) or
+**http://localhost:8080/swagger-ui.html** (API), and log in with the demo accounts below.
 
 - Port 8080 already in use? Run with another port, e.g. PowerShell `$env:APP_PORT=9090; docker compose up --build`.
 - Stop: `docker compose down`. Stop and delete the database too: `docker compose down -v`.
-- Override secrets with env vars or a `.env` file: `DB_PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`.
+- Override secrets with env vars or a `.env` file: `DB_PASSWORD`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`,
+  and the `SMS_*` / `TWILIO_*` variables for real SMS.
 
 ## Running it without Docker
 
@@ -86,7 +125,8 @@ If your password is different, set it first (PowerShell: `$env:DB_PASSWORD="your
 ./mvnw spring-boot:run
 ```
 
-Tables are created automatically. Open **http://localhost:8080/swagger-ui.html**.
+Tables are created automatically. Open **http://localhost:8080/** for the web app, or
+**http://localhost:8080/swagger-ui.html** for the raw API.
 
 ### 3. Demo logins
 
@@ -167,8 +207,37 @@ curl -X POST -H "Authorization: Bearer $HOSP" localhost:8080/api/requests/1/dono
 curl -H "Authorization: Bearer $ARUN" localhost:8080/api/me/eligibility
 ```
 
-Notifications are written to the console log (`[NOTIFY 98400…] …`). To send real SMS/WhatsApp messages,
-implement `NotificationService` with a provider such as Twilio or MSG91.
+## SMS notifications
+
+By default, messages are only written to the console log (`[SMS to +9198400…] …`).
+Set `SMS_PROVIDER=twilio` to send real SMS through [Twilio](https://www.twilio.com).
+
+How it works (`com.blooddonor.notification`):
+- `SmsNotificationService` converts numbers to E.164 (`9840000001` → `+919840000001`, landline `04420001111` → `+914420001111`).
+- It sends **only after the database transaction commits**, so nobody gets a text about a change that was rolled back.
+- It sends on a **background thread**, so a slow or failing SMS provider never slows down or breaks an API call. Failures are logged.
+- `TwilioSmsSender` calls Twilio's REST API directly with Spring's `RestClient`, so no SDK is needed.
+- **Safety:** `SMS_ALLOWED_NUMBERS` limits real SMS to the numbers you list. The sample donors use made-up numbers
+  that may belong to real people, so always set it while testing.
+
+### Try it with a free Twilio trial
+
+1. Sign up at twilio.com. A trial can only send to numbers you verify, so verify your own mobile under
+   *Phone Numbers → Verified Caller IDs*.
+2. From the Twilio console, copy the **Account SID** and **Auth Token**, and get a trial **phone number** (the sender).
+3. Set the env vars (PowerShell) and start the app:
+   ```powershell
+   $env:SMS_PROVIDER="twilio"
+   $env:TWILIO_ACCOUNT_SID="AC..."
+   $env:TWILIO_AUTH_TOKEN="..."
+   $env:TWILIO_FROM_NUMBER="+1..."
+   $env:SMS_ALLOWED_NUMBERS="+91<your mobile>"
+   ./mvnw spring-boot:run
+   ```
+4. Register yourself as a donor with that mobile number near a sample hospital, then raise a request for your
+   blood group as the hospital. The SMS arrives on your phone.
+
+Never commit the auth token. Keep it in env vars only.
 
 ## Configuration (`application.properties`)
 
@@ -190,4 +259,4 @@ jobs.eligibility-reminder.cron=0 0 9 * * *
 - Refresh tokens and logout (token blacklist)
 - PostGIS `geography` column and `ST_DWithin` for very large donor tables
 - Flyway migrations instead of `ddl-auto=update`
-- Real SMS/WhatsApp notifications, plus a React frontend with a map view
+- WhatsApp notifications (Twilio supports them with the same API), and an Indian SMS gateway with DLT templates

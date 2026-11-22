@@ -1,6 +1,6 @@
 # Run the whole stack (PostgreSQL + API) with one command:
 #   docker compose up --build
-# Then open http://localhost:8080/swagger-ui.html
+# Then open http://localhost:8080 (web app) or http://localhost:8080/swagger-ui.html (API)
 #
 # Optional overrides (shell env vars or a .env file next to this file):
 #   APP_PORT, DB_PASSWORD, JWT_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD
@@ -35,6 +35,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      # SMS: "log" (default) or "twilio" (see README, "SMS notifications")
+      SMS_PROVIDER: ${SMS_PROVIDER:-log}
+      SMS_ALLOWED_NUMBERS: ${SMS_ALLOWED_NUMBERS:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
     ports:
       - "${APP_PORT:-8080}:8080"
     restart: unless-stopped
