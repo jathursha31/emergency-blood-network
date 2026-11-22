@@ -1,13 +1,14 @@
 import { donorApi } from '../api/client';
+import { Leaderboard, RewardsCard } from '../components/rewards';
 import { useToast } from '../components/Toast';
 import { AsyncButton, Badge, BloodDrop, Empty } from '../components/ui';
 import { usePolling } from '../hooks/usePolling';
 import { fmtDate, fmtDateTime, isActiveRequest, timeLeft } from '../utils/format';
 
 async function loadDonorData() {
-    const [me, eligibility, inbox, donations] = await Promise.all([
-        donorApi.me(), donorApi.eligibility(), donorApi.inbox(), donorApi.donations()]);
-    return { me, eligibility, inbox, donations };
+    const [me, eligibility, inbox, donations, rewards] = await Promise.all([
+        donorApi.me(), donorApi.eligibility(), donorApi.inbox(), donorApi.donations(), donorApi.rewards()]);
+    return { me, eligibility, inbox, donations, rewards };
 }
 
 export default function DonorDashboard() {
@@ -20,18 +21,22 @@ export default function DonorDashboard() {
         <div className="grid grid-side">
             <div className="stack">
                 <ProfileCard me={data.me} eligibility={data.eligibility} reload={reload} />
+                <RewardsCard rewards={data.rewards} />
                 <section className="card">
                     <h2>My donations</h2>
                     <Donations list={data.donations} />
                 </section>
             </div>
-            <section className="card">
-                <div className="card-head">
-                    <h2>Requests near me</h2>
-                    <button className="btn secondary small" onClick={reload}>↻ Refresh</button>
-                </div>
-                <Inbox items={data.inbox} reload={reload} />
-            </section>
+            <div className="stack">
+                <section className="card">
+                    <div className="card-head">
+                        <h2>Requests near me</h2>
+                        <button className="btn secondary small" onClick={reload}>↻ Refresh</button>
+                    </div>
+                    <Inbox items={data.inbox} reload={reload} />
+                </section>
+                <Leaderboard highlightRank={data.rewards.leaderboardRank} />
+            </div>
         </div>
     );
 }

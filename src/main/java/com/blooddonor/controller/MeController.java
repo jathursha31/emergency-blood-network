@@ -2,9 +2,11 @@ package com.blooddonor.controller;
 
 import com.blooddonor.dto.DonorDtos.*;
 import com.blooddonor.dto.RequestDtos.DonorInboxItem;
+import com.blooddonor.dto.RewardDtos.MyRewards;
 import com.blooddonor.security.CurrentUser;
 import com.blooddonor.service.BloodRequestService;
 import com.blooddonor.service.DonorService;
+import com.blooddonor.service.RewardService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -22,10 +24,18 @@ public class MeController {
 
     private final DonorService donorService;
     private final BloodRequestService requestService;
+    private final RewardService rewardService;
 
-    public MeController(DonorService donorService, BloodRequestService requestService) {
+    public MeController(DonorService donorService, BloodRequestService requestService, RewardService rewardService) {
         this.donorService = donorService;
         this.requestService = requestService;
+        this.rewardService = rewardService;
+    }
+
+    /** My badge, donation count, lives helped and leaderboard rank. */
+    @GetMapping("/rewards")
+    public MyRewards rewards(@AuthenticationPrincipal Jwt jwt) {
+        return rewardService.forDonor(donorId(jwt));
     }
 
     @GetMapping

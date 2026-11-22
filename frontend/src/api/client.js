@@ -66,6 +66,7 @@ export const donorApi = {
     eligibility: () => api('GET', '/api/me/eligibility'),
     inbox: () => api('GET', '/api/me/requests'),
     donations: () => api('GET', '/api/me/donations'),
+    rewards: () => api('GET', '/api/me/rewards'),
     setAvailable: (available) => api('PATCH', '/api/me/availability', { available }),
     accept: (requestId) => api('POST', `/api/me/requests/${requestId}/accept`),
     decline: (requestId) => api('POST', `/api/me/requests/${requestId}/decline`),
@@ -86,4 +87,5 @@ export const hospitalApi = {
 
 export const publicApi = {
     compatibility: (group) => api('GET', `/api/blood-groups/${group}`),
+    leaderboard: (limit = 10) => api('GET', `/api/leaderboard?limit=${limit}`),
 };

@@ -44,7 +44,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, SpaController.ROUTES).permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/blood-groups/**", "/api/donors/nearby").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/blood-groups/**", "/api/donors/nearby",
+                                "/api/leaderboard").permitAll()
                         // donor self-service
                         .requestMatchers("/api/me/**").hasRole("DONOR")
                         // admin

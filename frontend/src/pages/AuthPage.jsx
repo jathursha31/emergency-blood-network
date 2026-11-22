@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { publicApi } from '../api/client';
 import { HOME_BY_ROLE, useAuth } from '../auth/AuthContext';
 import { LocationPicker } from '../components/maps';
+import { Leaderboard } from '../components/rewards';
 import { useToast } from '../components/Toast';
 import { BloodGroupSelect, readForm } from '../components/ui';
 import { BLOOD_GROUPS } from '../utils/format';
@@ -26,6 +27,7 @@ export default function AuthPage({ tab }) {
                     <li>Phone numbers stay hidden until a donor accepts</li>
                 </ul>
                 <CompatibilityChecker />
+                <div style={{ marginTop: '1rem' }}><Leaderboard limit={5} /></div>
             </section>
 
             <section className="card">
