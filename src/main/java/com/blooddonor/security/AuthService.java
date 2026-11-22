@@ -8,10 +8,12 @@ import com.blooddonor.dto.HospitalDtos.CreateHospital;
 import com.blooddonor.dto.HospitalDtos.HospitalView;
 import com.blooddonor.entity.Donor;
 import com.blooddonor.entity.Hospital;
+import com.blooddonor.entity.OtpCode;
 import com.blooddonor.entity.Role;
 import com.blooddonor.entity.UserAccount;
 import com.blooddonor.exception.BusinessRuleException;
 import com.blooddonor.exception.InvalidCredentialsException;
+import com.blooddonor.exception.InvalidOtpException;
 import com.blooddonor.repository.DonorRepository;
 import com.blooddonor.repository.HospitalRepository;
 import com.blooddonor.repository.UserAccountRepository;
@@ -32,6 +34,8 @@ public class AuthService {
     private final HospitalRepository hospitalRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final OtpService otpService;
+    private final OtpProperties otpProps;
 
     public AuthService(UserAccountRepository accounts,
                        DonorService donorService,
@@ -39,7 +43,11 @@ public class AuthService {
                        HospitalService hospitalService,
                        HospitalRepository hospitalRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       OtpService otpService,
+                       OtpProperties otpProps) {
+        this.otpService = otpService;
+        this.otpProps = otpProps;
         this.accounts = accounts;
         this.donorService = donorService;
         this.donorRepository = donorRepository;
@@ -47,6 +55,16 @@ public class AuthService {
         this.hospitalRepository = hospitalRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+    }
+
+    /** Password-less login for donors with a code sent to their registered mobile. */
+    @Transactional(readOnly = true)
+    public TokenResponse loginWithOtp(String phone, String code) {
+        UserAccount account = accounts.findByUsername(phone.trim())
+                .filter(a -> a.isEnabled() && a.getRole() == Role.DONOR)
+                .orElseThrow(() -> new InvalidOtpException("Wrong code. Request a new one."));
+        otpService.verify(account.getUsername(), OtpCode.Purpose.LOGIN, code);
+        return tokenFor(account);
     }
 
     @Transactional(readOnly = true)
@@ -63,6 +81,10 @@ public class AuthService {
         String username = req.donor().phone();
         if (accounts.existsByUsername(username)) {
             throw new BusinessRuleException("An account with phone " + username + " already exists");
+        }
+        if (otpProps.requiredForRegister()) {
+            if (req.otpCode() == null) throw new InvalidOtpException("Verify your mobile number: enter the code we sent by SMS");
+            otpService.verify(username, OtpCode.Purpose.REGISTER, req.otpCode());
         }
         DonorView donor = donorService.register(req.donor());
         UserAccount account = createAccount(username, req.password(), Role.DONOR,

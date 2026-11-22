@@ -110,7 +110,7 @@ public class DonorService {
         return donorRepository.findById(id).orElseThrow(() -> new NotFoundException("Donor", id));
     }
 
-    static String maskPhone(String phone) {
+    public static String maskPhone(String phone) {
         if (phone == null || phone.length() < 4) return "****";
         return phone.substring(0, 2) + "*".repeat(phone.length() - 4) + phone.substring(phone.length() - 2);
     }

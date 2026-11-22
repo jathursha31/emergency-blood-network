@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { publicApi } from '../api/client';
 import { HOME_BY_ROLE, useAuth } from '../auth/AuthContext';
 import { LocationPicker } from '../components/maps';
+import { OtpField } from '../components/OtpField';
 import { Leaderboard } from '../components/rewards';
 import { useToast } from '../components/Toast';
 import { BloodGroupSelect, readForm } from '../components/ui';
@@ -69,18 +70,20 @@ function CompatibilityChecker() {
 }
 
 function LoginForm() {
-    const { login } = useAuth();
+    const { login, loginWithOtp } = useAuth();
     const toast = useToast();
     const navigate = useNavigate();
+    const [mode, setMode] = useState('password');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [code, setCode] = useState('');
     const [busy, setBusy] = useState(false);
 
     const submit = async (e) => {
         e.preventDefault();
         setBusy(true);
         try {
-            const s = await login(username.trim(), password);
+            const s = mode === 'otp' ? await loginWithOtp(username.trim(), code) : await login(username.trim(), password);
             navigate(HOME_BY_ROLE[s.role], { replace: true });
         } catch (err) {
             toast(err.message, 'error');
@@ -91,24 +94,39 @@ function LoginForm() {
 
     return (
         <>
+            <div className="chips" style={{ marginBottom: '.8rem' }}>
+                <button type="button" className={`chip ${mode === 'password' ? 'active' : ''}`} onClick={() => setMode('password')}>
+                    Password</button>
+                <button type="button" className={`chip ${mode === 'otp' ? 'active' : ''}`} onClick={() => setMode('otp')}>
+                    📱 Code by SMS (donors)</button>
+            </div>
             <form onSubmit={submit}>
                 <div className="field">
-                    <label htmlFor="u">Username</label>
+                    <label htmlFor="u">{mode === 'otp' ? 'Mobile number' : 'Username'}</label>
                     <input id="u" value={username} onChange={e => setUsername(e.target.value)}
-                           autoComplete="username" required placeholder="Phone number or username" />
+                           autoComplete="username" required inputMode={mode === 'otp' ? 'numeric' : undefined}
+                           placeholder={mode === 'otp' ? '10-digit mobile number' : 'Phone number or username'} />
                 </div>
-                <div className="field">
-                    <label htmlFor="p">Password</label>
-                    <input id="p" type="password" value={password} onChange={e => setPassword(e.target.value)}
-                           autoComplete="current-password" required />
-                </div>
-                <button className="btn block" type="submit" disabled={busy}>{busy ? 'Logging in…' : 'Log in'}</button>
+                {mode === 'password' ? (
+                    <div className="field">
+                        <label htmlFor="p">Password</label>
+                        <input id="p" type="password" value={password} onChange={e => setPassword(e.target.value)}
+                               autoComplete="current-password" required />
+                    </div>
+                ) : (
+                    <div className="field">
+                        <label>Code</label>
+                        <OtpField phone={username.trim()} purpose="LOGIN" code={code} setCode={setCode} />
+                    </div>
+                )}
+                <button className="btn block" type="submit" disabled={busy || (mode === 'otp' && code.length !== 6)}>
+                    {busy ? 'Logging in…' : 'Log in'}</button>
             </form>
             <p className="small muted" style={{ marginTop: '1rem' }}>Demo accounts from the sample data (click to fill):</p>
             <div className="demo">
                 {DEMO_ACCOUNTS.map(a => (
                     <button key={a.username} className="btn secondary small"
-                            onClick={() => { setUsername(a.username); setPassword(a.password); }}>{a.label}</button>
+                            onClick={() => { setMode('password'); setUsername(a.username); setPassword(a.password); }}>{a.label}</button>
                 ))}
             </div>
         </>
@@ -121,10 +139,13 @@ function SignupForm() {
     const navigate = useNavigate();
     const [location, setLocation] = useState({ latitude: '', longitude: '' });
     const [busy, setBusy] = useState(false);
+    const [phone, setPhone] = useState('');
+    const [code, setCode] = useState('');
 
     const submit = async (e) => {
         e.preventDefault();
         const f = readForm(e.currentTarget);
+        if (code.length !== 6) { toast('Verify your mobile number: send the code and type it in', 'error'); return; }
         const donor = {
             fullName: f.fullName, phone: f.phone, email: f.email || null, dateOfBirth: f.dateOfBirth,
             bloodGroup: f.bloodGroup, latitude: parseFloat(location.latitude), longitude: parseFloat(location.longitude),
@@ -132,7 +153,7 @@ function SignupForm() {
         };
         setBusy(true);
         try {
-            await register(donor, f.password);
+            await register(donor, f.password, code);
             toast('Welcome! You are registered as a donor.', 'ok');
             navigate('/donor', { replace: true });
         } catch (err) {
@@ -147,11 +168,16 @@ function SignupForm() {
             <div className="fields-2">
                 <div className="field"><label>Full name</label><input name="fullName" required maxLength={100} /></div>
                 <div className="field"><label>Mobile number</label>
-                    <input name="phone" required pattern="[6-9][0-9]{9}" placeholder="10 digits" inputMode="numeric" /></div>
+                    <input name="phone" required pattern="[6-9][0-9]{9}" placeholder="10 digits" inputMode="numeric"
+                           value={phone} onChange={e => setPhone(e.target.value.trim())} /></div>
                 <div className="field"><label>Date of birth</label><input name="dateOfBirth" type="date" required /></div>
                 <div className="field"><label>Blood group</label><BloodGroupSelect name="bloodGroup" /></div>
                 <div className="field"><label>City / area</label><input name="city" maxLength={60} placeholder="e.g. Adyar" /></div>
                 <div className="field"><label>Last donation (optional)</label><input name="lastDonationDate" type="date" /></div>
+            </div>
+            <div className="field">
+                <label>Verify your mobile</label>
+                <OtpField phone={phone} purpose="REGISTER" code={code} setCode={setCode} />
             </div>
             <div className="field">
                 <label>Your location: click on the map</label>
@@ -163,7 +189,7 @@ function SignupForm() {
                     <input name="password" type="password" minLength={8} required autoComplete="new-password" /></div>
             </div>
             <button className="btn block" type="submit" disabled={busy}>{busy ? 'Registering…' : 'Register as donor'}</button>
-            <p className="hint">You will log in with your mobile number.</p>
+            <p className="hint">You will log in with your mobile number, using your password or a code by SMS.</p>
         </form>
     );
 }

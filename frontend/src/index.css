@@ -274,3 +274,9 @@ code { font-family: ui-monospace, Consolas, monospace; font-size: .85rem; backgr
 .hbar-value { text-align: right; color: var(--ink); font-variant-numeric: tabular-nums; }
 .chart-table { margin-top: .5rem; font-size: .82rem; }
 .chart-table summary { color: var(--muted); cursor: pointer; }
+
+/* ---------- OTP ---------- */
+.otp-box .row { flex-wrap: nowrap; }
+.otp-input { flex: 1; letter-spacing: .35em; font-weight: 700; font-size: 1.05rem; }
+.dev-note { margin-top: .35rem; font-size: .82rem; background: var(--blue-soft); color: var(--blue);
+    padding: .35rem .55rem; border-radius: 8px; display: flex; gap: .4rem; align-items: center; flex-wrap: wrap; }

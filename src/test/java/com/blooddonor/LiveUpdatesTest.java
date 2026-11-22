@@ -39,10 +39,13 @@ class LiveUpdatesTest {
         post("/api/hospitals", hospital("Live Two", "04400100002", "live_two"), admin);
         String one = token(post("/api/auth/login", "{\"username\":\"live_one\",\"password\":\"staff-pass-1\"}", null));
         String two = token(post("/api/auth/login", "{\"username\":\"live_two\",\"password\":\"staff-pass-1\"}", null));
+        Matcher otp = Pattern.compile("\"devCode\":\"(\\d{6})\"").matcher(
+                post("/api/auth/otp/request", "{\"phone\":\"9333333333\",\"purpose\":\"REGISTER\"}", null).body());
+        assertThat(otp.find()).isTrue();
         String donor = token(post("/api/auth/register", """
                 {"donor":{"fullName":"Live Donor","phone":"9333333333","dateOfBirth":"1994-04-04",
                  "bloodGroup":"O_NEG","latitude":13.041,"longitude":80.234,"city":"Chennai"},
-                 "password":"donor-pass-1"}""", null));
+                 "password":"donor-pass-1","otpCode":"%s"}""".formatted(otp.group(1)), null));
 
         BlockingQueue<String> oneEvents = listen(one);
         BlockingQueue<String> twoEvents = listen(two);

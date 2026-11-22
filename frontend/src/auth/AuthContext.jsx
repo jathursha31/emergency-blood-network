@@ -61,11 +61,14 @@ export function AuthProvider({ children }) {
     const login = useCallback(async (username, password) =>
         startSession(await authApi.login(username, password)), [startSession]);
 
-    const register = useCallback(async (donor, password) =>
-        startSession(await authApi.register(donor, password)), [startSession]);
+    const register = useCallback(async (donor, password, otpCode) =>
+        startSession(await authApi.register(donor, password, otpCode)), [startSession]);
 
-    const value = useMemo(() => ({ session, login, register, logout, expired }),
-        [session, login, register, logout, expired]);
+    const loginWithOtp = useCallback(async (phone, code) =>
+        startSession(await authApi.otpLogin(phone, code)), [startSession]);
+
+    const value = useMemo(() => ({ session, login, loginWithOtp, register, logout, expired }),
+        [session, login, loginWithOtp, register, logout, expired]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

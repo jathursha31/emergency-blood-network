@@ -71,12 +71,18 @@ class BloodDonorNetworkApplicationTests {
         assertThat(call("POST", "/api/hospitals", hospitalJson("Beta Hospital", "04400000002", "beta_staff"), admin)
                 .statusCode()).isEqualTo(201);
 
-        // donor signs up publicly and is logged in at once
+        // donor verifies the mobile with an OTP, signs up publicly and is logged in at once
+        HttpResponse<String> otp = call("POST", "/api/auth/otp/request",
+                "{\"phone\":\"9111111111\",\"purpose\":\"REGISTER\"}", null);
+        assertThat(otp.statusCode()).isEqualTo(200);
+        Matcher code = Pattern.compile("\"devCode\":\"(\\d{6})\"").matcher(otp.body());
+        assertThat(code.find()).as(otp.body()).isTrue();
+
         HttpResponse<String> signup = call("POST", "/api/auth/register", """
                 {"donor":{"fullName":"Web Donor","phone":"9111111111","dateOfBirth":"1995-05-05",
                  "bloodGroup":"B_POS","latitude":13.0405,"longitude":80.2335,"city":"Chennai"},
-                 "password":"donor-pass-1"}""", null);
-        assertThat(signup.statusCode()).isEqualTo(201);
+                 "password":"donor-pass-1","otpCode":"%s"}""".formatted(code.group(1)), null);
+        assertThat(signup.statusCode()).as(signup.body()).isEqualTo(201);
         String donor = token(signup);
         long donorId = number(signup.body(), "donorId");
 

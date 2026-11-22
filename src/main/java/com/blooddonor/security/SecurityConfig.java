@@ -47,7 +47,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/", "/index.html", "/assets/**").permitAll()
                         .requestMatchers(HttpMethod.GET, SpaController.ROUTES).permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
+                                "/api/auth/otp/request", "/api/auth/otp/login").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/blood-groups/**", "/api/donors/nearby",
                                 "/api/leaderboard", "/api/camps", "/api/camps/*/slots").permitAll()
                         .requestMatchers("/api/camps/**").hasAnyRole("HOSPITAL", "ADMIN")

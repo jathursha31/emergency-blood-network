@@ -3,6 +3,7 @@ package com.blooddonor.controller;
 import com.blooddonor.dto.AuthDtos.*;
 import com.blooddonor.security.AuthService;
 import com.blooddonor.security.CurrentUser;
+import com.blooddonor.security.OtpService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -14,9 +15,11 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final OtpService otpService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, OtpService otpService) {
         this.authService = authService;
+        this.otpService = otpService;
     }
 
     /** Returns a JWT. Send it on later calls as the header: Authorization: Bearer &lt;token&gt; */
@@ -30,6 +33,18 @@ public class AuthController {
     @ResponseStatus(HttpStatus.CREATED)
     public TokenResponse register(@Valid @RequestBody RegisterDonorAccount request) {
         return authService.registerDonor(request);
+    }
+
+    /** Sends a 6-digit code by SMS. purpose REGISTER (verify a new number) or LOGIN (donor login without password). */
+    @PostMapping("/otp/request")
+    public OtpSent requestOtp(@Valid @RequestBody OtpRequest request) {
+        return otpService.request(request.phone(), request.purpose());
+    }
+
+    /** Donor login with the code instead of a password. */
+    @PostMapping("/otp/login")
+    public TokenResponse loginWithOtp(@Valid @RequestBody OtpLogin request) {
+        return authService.loginWithOtp(request.phone(), request.code());
     }
 
     @GetMapping("/me")
