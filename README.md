@@ -23,7 +23,7 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | Reminders | Daily 9 AM job notifies donors whose 90-day wait ends today. |
 | Web app | Built-in frontend at `/` with donor, hospital and admin dashboards and Leaflet maps. |
 | Blood bank inventory | Units per blood group per hospital, with a minimum level. Falling below it automatically raises a restock request to nearby donors, and the units donated for it go back into stock. |
-| Donation camps | Hospitals run one-day camps with time slots. Eligible donors within 15 km are invited, book a slot (row lock prevents overbooking), get a QR pass, and are checked in on the day, which records the donation and adds a unit to stock. |
+| Donation camps | Hospitals run one-day camps with time slots. Eligible donors within 15 km are invited, book a slot (row lock prevents overbooking), get a QR pass, and are checked in on the day by scanning it with the camera (or typing the code), which records the donation and adds a unit to stock. |
 | Live updates | Server-Sent Events (`/api/live`) push changes after commit: hospitals see accepts and bookings, donors see new requests, and accepted donors appear on the request map (~1 km precision). |
 | Donor rewards | Badges (First Drop 1, Bronze 3, Life Saver 5, Hero 10, Legend 25), "lives helped", and a public leaderboard showing short names only. |
 | Admin analytics | Fulfilment rate, average response and fulfilment time, demand vs supply per blood group, a 14-day trend, and per-hospital stats. |
@@ -77,7 +77,7 @@ Lists refresh automatically every 20 seconds. Maps use OpenStreetMap tiles via L
 
 ## Tech stack
 
-**Backend:** Java 21 · Spring Boot 4.1 · Spring Security (OAuth2 resource server, JWT) · Spring Data JPA (Hibernate) · PostgreSQL · Bean Validation · springdoc-openapi · Docker / Docker Compose · JUnit 5 + H2 for tests
+**Backend:** Java 21 · Spring Boot 4.1 · Spring Security (OAuth2 resource server, JWT) · Spring Data JPA (Hibernate) · PostgreSQL · Flyway · Bean Validation · springdoc-openapi · Docker / Docker Compose · JUnit 5 + H2 for tests
 
 **Frontend:** React 19 · Vite · React Router · Leaflet / react-leaflet (OpenStreetMap)
 
@@ -132,7 +132,7 @@ If your password is different, set it first (PowerShell: `$env:DB_PASSWORD="your
 ./mvnw spring-boot:run
 ```
 
-Tables are created automatically. Open **http://localhost:8080/** for the web app, or
+Flyway creates the tables from `src/main/resources/db/migration` on first start. Open **http://localhost:8080/** for the web app, or
 **http://localhost:8080/swagger-ui.html** for the raw API.
 
 ### 3. Demo logins
@@ -256,6 +256,19 @@ How it works (`com.blooddonor.notification`):
 
 Never commit the auth token. Keep it in env vars only.
 
+## Database migrations (Flyway)
+
+The schema lives in versioned SQL files in `src/main/resources/db/migration`, and Hibernate runs with
+`ddl-auto=validate`: it never changes tables, it only refuses to start if an entity and the schema disagree.
+
+- **New database:** Flyway runs `V1__init_schema.sql` and records it in `flyway_schema_history`.
+- **Database created before Flyway** (by the old `ddl-auto=update`): `baseline-on-migrate` marks it as version 1
+  without touching the data, and later migrations apply normally.
+- **Changing the schema:** change the entity, then add a new file such as `V2__add_donor_weight.sql`.
+  Never edit a migration that has already run, because Flyway checksums it.
+- The tests run the same migrations on H2 (PostgreSQL mode) and validate them against the entities, so a missing
+  migration fails the build.
+
 ## Configuration (`application.properties`)
 
 ```properties
@@ -275,7 +288,6 @@ jobs.eligibility-reminder.cron=0 0 9 * * *
 
 - Refresh tokens and logout (token blacklist)
 - PostGIS `geography` column and `ST_DWithin` for very large donor tables
-- Flyway migrations instead of `ddl-auto=update`
 - An Indian SMS gateway with DLT templates (MSG91, Fast2SMS)
 - Scanning the camp QR pass with the phone camera at check-in
 - Analytics as SQL aggregate queries or a reporting table for large data
