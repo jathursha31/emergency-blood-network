@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { hospitalApi, requestApi } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
+import { CampsForHospital } from '../components/camps';
 import { BloodBank } from '../components/inventory';
 import { HospitalMap } from '../components/maps';
 import { RequestForm, RequestsPanel } from '../components/requests';
@@ -8,7 +9,7 @@ import { useToast } from '../components/Toast';
 import { Empty } from '../components/ui';
 import { usePolling } from '../hooks/usePolling';
 
-const TABS = [['requests', '🚨 Requests'], ['bank', '🏦 Blood bank']];
+const TABS = [['requests', '🚨 Requests'], ['bank', '🏦 Blood bank'], ['camps', '⛺ Camps']];
 
 export default function HospitalDashboard() {
     const { session } = useAuth();
@@ -54,6 +55,7 @@ export default function HospitalDashboard() {
             )}
 
             {tab === 'bank' && <BloodBank onRequestCreated={reload} />}
+            {tab === 'camps' && <CampsForHospital hospital={hospital} />}
         </>
     );
 }

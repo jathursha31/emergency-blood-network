@@ -29,10 +29,15 @@ public class EligibilityService {
     }
 
     public Eligibility check(Donor donor) {
+        return checkOn(donor, today());
+    }
+
+    /** Can this donor give blood on the given (today or future) date, e.g. a camp day? */
+    public Eligibility checkOn(Donor donor, LocalDate date) {
         LocalDate today = today();
         List<String> reasons = new ArrayList<>();
 
-        int age = Period.between(donor.getDateOfBirth(), today).getYears();
+        int age = Period.between(donor.getDateOfBirth(), date).getYears();
         if (age < props.minDonorAge()) {
             reasons.add("Donor must be at least " + props.minDonorAge() + " years old (current age " + age + ")");
         }
@@ -45,7 +50,7 @@ public class EligibilityService {
 
         LocalDate nextEligible = nextEligibleDate(donor);
         long daysRemaining = Math.max(0, ChronoUnit.DAYS.between(today, nextEligible));
-        if (daysRemaining > 0) {
+        if (nextEligible.isAfter(date)) {
             reasons.add("Last donation was on " + donor.getLastDonationDate()
                     + "; must wait " + props.minDaysBetweenDonations() + " days between donations");
         }

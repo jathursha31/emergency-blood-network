@@ -2,11 +2,13 @@ package com.blooddonor.service;
 
 import com.blooddonor.dto.DonorDtos.*;
 import com.blooddonor.entity.BloodGroup;
+import com.blooddonor.entity.CampBooking;
 import com.blooddonor.entity.Donor;
 import com.blooddonor.entity.DonorResponse;
 import com.blooddonor.entity.ResponseStatus;
 import com.blooddonor.exception.BusinessRuleException;
 import com.blooddonor.exception.NotFoundException;
+import com.blooddonor.repository.CampBookingRepository;
 import com.blooddonor.repository.DonorRepository;
 import com.blooddonor.repository.DonorResponseRepository;
 import com.blooddonor.util.GeoUtils;
@@ -24,15 +26,18 @@ public class DonorService {
     private final DonorResponseRepository responseRepository;
     private final EligibilityService eligibilityService;
     private final DonorMatchingService matchingService;
+    private final CampBookingRepository campBookingRepository;
 
     public DonorService(DonorRepository donorRepository,
                         DonorResponseRepository responseRepository,
                         EligibilityService eligibilityService,
-                        DonorMatchingService matchingService) {
+                        DonorMatchingService matchingService,
+                        CampBookingRepository campBookingRepository) {
         this.donorRepository = donorRepository;
         this.responseRepository = responseRepository;
         this.eligibilityService = eligibilityService;
         this.matchingService = matchingService;
+        this.campBookingRepository = campBookingRepository;
     }
 
     public DonorView register(RegisterDonor req) {
@@ -71,9 +76,15 @@ public class DonorService {
     @Transactional(readOnly = true)
     public List<DonationRecord> donationHistory(Long id) {
         find(id);
-        return responseRepository.findByDonorIdAndStatusOrderByDonatedAtDesc(id, ResponseStatus.DONATED)
-                .stream()
-                .map(this::toDonationRecord)
+        var fromRequests = responseRepository.findByDonorIdAndStatusOrderByDonatedAtDesc(id, ResponseStatus.DONATED)
+                .stream().map(this::toDonationRecord);
+        var fromCamps = campBookingRepository.findByDonorIdAndStatusOrderByCheckedInAtDesc(id, CampBooking.Status.ATTENDED)
+                .stream().map(b -> new DonationRecord(null,
+                        b.getCamp().getName() + " (camp by " + b.getCamp().getHospital().getName() + ")",
+                        "Camp", b.getCheckedInAt()));
+        return java.util.stream.Stream.concat(fromRequests, fromCamps)
+                .sorted(java.util.Comparator.comparing(DonationRecord::donatedAt,
+                        java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())))
                 .toList();
     }
 

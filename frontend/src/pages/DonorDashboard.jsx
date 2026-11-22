@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { donorApi } from '../api/client';
+import { CampsForDonor, MyCampBookings } from '../components/camps';
 import { Leaderboard, RewardsCard } from '../components/rewards';
 import { useToast } from '../components/Toast';
 import { AsyncButton, Badge, BloodDrop, Empty } from '../components/ui';
@@ -11,11 +13,17 @@ async function loadDonorData() {
     return { me, eligibility, inbox, donations, rewards };
 }
 
+const TABS = [['requests', '🚨 Requests'], ['camps', '⛺ Camps'], ['leaderboard', '🏆 Leaderboard']];
+
 export default function DonorDashboard() {
     const { data, error, loading, reload } = usePolling(loadDonorData);
+    const [tab, setTab] = useState('requests');
+    const [bookingsVersion, setBookingsVersion] = useState(0);
 
     if (loading) return <Empty>Loading…</Empty>;
     if (!data) return <Empty>{error?.message || 'Could not load your data.'}</Empty>;
+
+    const openRequests = data.inbox.filter(i => isActiveRequest(i.requestStatus) && i.myStatus === 'NOTIFIED').length;
 
     return (
         <div className="grid grid-side">
@@ -27,15 +35,31 @@ export default function DonorDashboard() {
                     <Donations list={data.donations} />
                 </section>
             </div>
-            <div className="stack">
-                <section className="card">
-                    <div className="card-head">
-                        <h2>Requests near me</h2>
-                        <button className="btn secondary small" onClick={reload}>↻ Refresh</button>
-                    </div>
-                    <Inbox items={data.inbox} reload={reload} />
-                </section>
-                <Leaderboard highlightRank={data.rewards.leaderboardRank} />
+            <div>
+                <div className="tabs">
+                    {TABS.map(([key, label]) => (
+                        <button key={key} className={`tab ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>
+                            {label}{key === 'requests' && openRequests > 0 && <span className="count">{openRequests}</span>}
+                        </button>
+                    ))}
+                </div>
+                {tab === 'requests' && (
+                    <section className="card">
+                        <div className="card-head">
+                            <h2>Requests near me</h2>
+                            <button className="btn secondary small" onClick={reload}>↻ Refresh</button>
+                        </div>
+                        <Inbox items={data.inbox} reload={reload} />
+                    </section>
+                )}
+                {tab === 'camps' && (
+                    <section className="card">
+                        <MyCampBookings refreshKey={bookingsVersion} />
+                        <h2>Upcoming camps</h2>
+                        <CampsForDonor me={data.me} onBooked={() => setBookingsVersion(v => v + 1)} />
+                    </section>
+                )}
+                {tab === 'leaderboard' && <Leaderboard limit={20} highlightRank={data.rewards.leaderboardRank} />}
             </div>
         </div>
     );
@@ -174,11 +198,13 @@ function Donations({ list }) {
     if (!list.length) return <Empty>No donations recorded yet.</Empty>;
     return (
         <div className="list">
-            {list.map(d => (
-                <div className="item" key={d.requestId}>
+            {list.map((d, i) => (
+                <div className="item" key={(d.requestId ?? 'camp') + '-' + i}>
                     <div className="row"><b>{d.hospitalName}</b><span className="spacer" />
                         <span className="small muted">{fmtDate(d.donatedAt)}</span></div>
-                    <div className="small muted">For a {d.patientBloodGroup} patient · request #{d.requestId}</div>
+                    <div className="small muted">{d.requestId
+                        ? <>For a {d.patientBloodGroup} patient · request #{d.requestId}</>
+                        : <>⛺ Donation camp · blood went to the hospital's blood bank</>}</div>
                 </div>
             ))}
             <p className="small muted" style={{ margin: '.25rem 0 0' }}>

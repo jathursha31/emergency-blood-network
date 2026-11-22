@@ -79,6 +79,19 @@ export const requestApi = {
     markDonated: (id, donorId) => api('POST', `/api/requests/${id}/donors/${donorId}/donated`),
 };
 
+export const campApi = {
+    upcoming: (lat, lng) => api('GET', '/api/camps' + (lat != null ? `?lat=${lat}&lng=${lng}` : '')),
+    get: (id) => api('GET', `/api/camps/${id}/slots`),
+    create: (body) => api('POST', '/api/camps', body),
+    hosted: () => api('GET', '/api/camps/hosted'),
+    bookings: (id) => api('GET', `/api/camps/${id}/bookings`),
+    cancel: (id) => api('POST', `/api/camps/${id}/cancel`),
+    checkIn: (code) => api('POST', '/api/camps/check-in', { code }),
+    myBookings: () => api('GET', '/api/me/camp-bookings'),
+    book: (campId, slotTime) => api('POST', '/api/me/camp-bookings', { campId, slotTime }),
+    cancelBooking: (id) => api('POST', `/api/me/camp-bookings/${id}/cancel`),
+};
+
 const hq = (hospitalId) => (hospitalId ? `?hospitalId=${hospitalId}` : '');
 
 export const inventoryApi = {
