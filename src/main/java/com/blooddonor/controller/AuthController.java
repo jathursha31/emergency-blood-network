@@ -99,6 +99,19 @@ public class AuthController {
         return Map.of("sessionsClosed", closed);
     }
 
+    /**
+     * Change my password. Every session (other devices too) is ended; this device gets a fresh session,
+     * so the caller stays logged in.
+     */
+    @PostMapping("/change-password")
+    public TokenResponse changePassword(@AuthenticationPrincipal Jwt jwt,
+                                        @Valid @RequestBody com.blooddonor.dto.AdminDtos.ChangePassword body,
+                                        HttpServletRequest http, HttpServletResponse res) {
+        String username = CurrentUser.from(jwt).username();
+        authService.changePassword(username, body.currentPassword(), body.newPassword());
+        return startSession(authService.sessionToken(username, null), http, res);
+    }
+
     @GetMapping("/me")
     public Me me(@AuthenticationPrincipal Jwt jwt) {
         CurrentUser user = CurrentUser.from(jwt);

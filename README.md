@@ -29,6 +29,8 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | Live updates | Server-Sent Events (`/api/live`) push changes after commit: hospitals see accepts and bookings, donors see new requests, and accepted donors appear on the request map (~1 km precision). |
 | Donor rewards | Badges (First Drop 1, Bronze 3, Life Saver 5, Hero 10, Legend 25), "lives helped", and a public leaderboard showing short names only. |
 | Admin analytics | Fulfilment rate, average response and fulfilment time, demand vs supply per blood group, a 14-day trend, and per-hospital stats. |
+| User management | Admins search accounts (last login, active sessions), **disable** one (logged out everywhere at once; the last admin and your own account are protected), enable it again, or **reset a password** (a random temporary password shown once). Anyone can change their own password, which logs out their other devices. |
+| Audit log | Append-only record of logins, failed logins (with reason and IP), OTP logins, logouts, token-theft detection, password changes and resets, disables and enables, sign-ups and new hospitals. Each entry is written in its own transaction, so failures are recorded too. Filterable in the admin UI. |
 | OTP | Sign-up verifies the mobile with a 6-digit SMS code, and donors can log in with a code instead of a password. Codes are hashed, expire, are rate limited and allow 5 attempts. |
 | WhatsApp | `SMS_CHANNEL=whatsapp` sends the same notifications over Twilio WhatsApp. |
 | API docs | Swagger UI at `/swagger-ui.html`, with an **Authorize** button for the JWT. |
@@ -187,6 +189,10 @@ These defaults are for local development only. Elsewhere, set the `JWT_SECRET` (
 | POST | `/api/camps`, GET `/api/camps/hosted`, `/{id}/bookings`, POST `/{id}/cancel`, `/check-in` | HOSPITAL, ADMIN | Run camps |
 | GET | `/api/inventory`, PUT `/{group}`, POST `/{group}/use`, `/{group}/add` | HOSPITAL (own), ADMIN (`?hospitalId=`) | Blood bank |
 | GET | `/api/inventory/overview`, `/api/admin/analytics` | ADMIN | All blood banks, analytics |
+| GET | `/api/admin/users?q=&role=&enabled=&page=` | ADMIN | Search accounts |
+| POST | `/api/admin/users/{id}/disable` `{"reason"}`, `/enable`, `/reset-password` | ADMIN | Manage an account |
+| GET | `/api/admin/audit?user=&action=&page=` | ADMIN | Audit log, newest first |
+| POST | `/api/auth/change-password` `{"currentPassword","newPassword"}` | any logged in | Change my password |
 | GET | `/api/auth/me` | any logged in | Who am I |
 | GET | `/api/me` | DONOR | My profile |
 | PATCH | `/api/me/availability` | DONOR | `{"available": false}` |

@@ -94,8 +94,19 @@ export function AuthProvider({ children }) {
     const loginWithOtp = useCallback(async (phone, code) =>
         startSession(await authApi.otpLogin(phone, code)), [startSession]);
 
-    const value = useMemo(() => ({ session, login, loginWithOtp, register, logout, logoutEverywhere, expired }),
-        [session, login, loginWithOtp, register, logout, logoutEverywhere, expired]);
+    /** Other devices are logged out; this one gets a fresh session from the response. */
+    const changePassword = useCallback(async (currentPassword, newPassword) => {
+        const t = await authApi.changePassword(currentPassword, newPassword);
+        setToken(t.accessToken);
+        setSession(prev => {
+            const next = { ...prev, accessToken: t.accessToken, expiresAt: t.expiresAt };
+            persist(next);
+            return next;
+        });
+    }, []);
+
+    const value = useMemo(() => ({ session, login, loginWithOtp, register, logout, logoutEverywhere, changePassword, expired }),
+        [session, login, loginWithOtp, register, logout, logoutEverywhere, changePassword, expired]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -97,6 +97,8 @@ export const authApi = {
     requestOtp: (phone, purpose) => api('POST', '/api/auth/otp/request', { phone, purpose }),
     logout: () => fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {}),
     logoutAll: () => api('POST', '/api/auth/logout-all'),
+    changePassword: (currentPassword, newPassword) =>
+        api('POST', '/api/auth/change-password', { currentPassword, newPassword }),
     otpLogin: (phone, code) => api('POST', '/api/auth/otp/login', { phone, code }),
 };
 
@@ -116,6 +118,19 @@ export const requestApi = {
     create: (body) => api('POST', '/api/requests', body),
     cancel: (id) => api('POST', `/api/requests/${id}/cancel`),
     markDonated: (id, donorId) => api('POST', `/api/requests/${id}/donors/${donorId}/donated`),
+};
+
+const qs = (params) => {
+    const p = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '');
+    return p.length ? '?' + p.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&') : '';
+};
+
+export const adminApi = {
+    users: (params) => api('GET', '/api/admin/users' + qs(params)),
+    disable: (id, reason) => api('POST', `/api/admin/users/${id}/disable`, { reason }),
+    enable: (id) => api('POST', `/api/admin/users/${id}/enable`),
+    resetPassword: (id) => api('POST', `/api/admin/users/${id}/reset-password`),
+    audit: (params) => api('GET', '/api/admin/audit' + qs(params)),
 };
 
 export const campApi = {

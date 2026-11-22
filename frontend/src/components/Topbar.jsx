@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChangePasswordDialog } from './ChangePasswordDialog';
 import { useAuth } from '../auth/AuthContext';
 import { useLiveStatus } from '../hooks/live';
 import { useToast } from './Toast';
@@ -10,6 +12,7 @@ export default function Topbar() {
     const navigate = useNavigate();
     const toast = useToast();
     const live = useLiveStatus();
+    const [passwordOpen, setPasswordOpen] = useState(false);
 
     const signOut = async () => {
         await logout();
@@ -37,11 +40,13 @@ export default function Topbar() {
                           title={live ? 'Live updates on' : 'Reconnecting… (data still refreshes every 20 s)'}>
                         {live ? 'Live' : 'Offline'}</span>
                     <span><b>{session.displayName}</b> · {ROLE_NAME[session.role]}</span>
+                    <button className="linkbtn small" onClick={() => setPasswordOpen(true)}>Password</button>
                     <button className="btn secondary small" onClick={signOut}>Log out</button>
                     <button className="linkbtn small" onClick={signOutEverywhere}
                             title="End every session of this account, on all devices">All devices</button>
                 </div>
             )}
+            {passwordOpen && <ChangePasswordDialog onClose={() => setPasswordOpen(false)} />}
         </header>
     );
 }

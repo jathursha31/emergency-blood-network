@@ -6,6 +6,7 @@ import com.blooddonor.dto.AuthDtos.TokenResponse;
 import com.blooddonor.dto.DonorDtos.DonorView;
 import com.blooddonor.dto.HospitalDtos.CreateHospital;
 import com.blooddonor.dto.HospitalDtos.HospitalView;
+import com.blooddonor.entity.AuditEvent;
 import com.blooddonor.entity.Donor;
 import com.blooddonor.entity.Hospital;
 import com.blooddonor.entity.OtpCode;
@@ -23,6 +24,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.LocalDateTime;
+
 @Service
 @Transactional
 public class AuthService {
@@ -36,6 +40,9 @@ public class AuthService {
     private final JwtService jwtService;
     private final OtpService otpService;
     private final OtpProperties otpProps;
+    private final AuditService audit;
+    private final Clock clock;
+    private final RefreshTokenService refreshTokens;
 
     public AuthService(UserAccountRepository accounts,
                        DonorService donorService,
@@ -45,7 +52,13 @@ public class AuthService {
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        OtpService otpService,
-                       OtpProperties otpProps) {
+                       OtpProperties otpProps,
+                       AuditService audit,
+                       Clock clock,
+                       RefreshTokenService refreshTokens) {
+        this.refreshTokens = refreshTokens;
+        this.audit = audit;
+        this.clock = clock;
         this.otpService = otpService;
         this.otpProps = otpProps;
         this.accounts = accounts;
@@ -58,22 +71,57 @@ public class AuthService {
     }
 
     /** Password-less login for donors with a code sent to their registered mobile. */
-    @Transactional(readOnly = true)
     public TokenResponse loginWithOtp(String phone, String code) {
         UserAccount account = accounts.findByUsername(phone.trim())
                 .filter(a -> a.isEnabled() && a.getRole() == Role.DONOR)
-                .orElseThrow(() -> new InvalidOtpException("Wrong code. Request a new one."));
-        otpService.verify(account.getUsername(), OtpCode.Purpose.LOGIN, code);
+                .orElse(null);
+        if (account == null) {
+            audit.record(null, AuditEvent.Action.LOGIN_FAILED, phone.trim(), "OTP login: unknown or disabled account");
+            throw new InvalidOtpException("Wrong code. Request a new one.");
+        }
+        try {
+            otpService.verify(account.getUsername(), OtpCode.Purpose.LOGIN, code);
+        } catch (InvalidOtpException e) {
+            audit.record(null, AuditEvent.Action.LOGIN_FAILED, account.getUsername(), "OTP login: " + e.getMessage());
+            throw e;
+        }
+        loggedIn(account, AuditEvent.Action.OTP_LOGIN);
         return tokenFor(account);
     }
 
-    @Transactional(readOnly = true)
     public TokenResponse login(LoginRequest req) {
-        UserAccount account = accounts.findByUsername(req.username().trim())
-                .filter(UserAccount::isEnabled)
-                .filter(a -> passwordEncoder.matches(req.password(), a.getPasswordHash()))
-                .orElseThrow(InvalidCredentialsException::new); // same error for unknown user and wrong password
+        String username = req.username().trim();
+        UserAccount account = accounts.findByUsername(username).orElse(null);
+        if (account == null || !passwordEncoder.matches(req.password(), account.getPasswordHash())) {
+            audit.record(null, AuditEvent.Action.LOGIN_FAILED, username, account == null ? "unknown username" : "wrong password");
+            throw new InvalidCredentialsException(); // same error for unknown user and wrong password
+        }
+        if (!account.isEnabled()) {
+            audit.record(null, AuditEvent.Action.LOGIN_FAILED, username, "account disabled");
+            throw new InvalidCredentialsException();
+        }
+        loggedIn(account, AuditEvent.Action.LOGIN);
         return tokenFor(account);
+    }
+
+    private void loggedIn(UserAccount account, AuditEvent.Action how) {
+        account.setLastLoginAt(LocalDateTime.now(clock));
+        audit.record(account.getUsername(), how, account.getUsername(), null);
+    }
+
+    /** Change my own password. Ends every session (the caller then gets a fresh one). */
+    public void changePassword(String username, String currentPassword, String newPassword) {
+        UserAccount account = accounts.findByUsername(username).orElseThrow(InvalidCredentialsException::new);
+        if (!passwordEncoder.matches(currentPassword, account.getPasswordHash())) {
+            audit.record(username, AuditEvent.Action.LOGIN_FAILED, username, "change password: wrong current password");
+            throw new BusinessRuleException("Your current password is not correct");
+        }
+        if (passwordEncoder.matches(newPassword, account.getPasswordHash())) {
+            throw new BusinessRuleException("The new password must be different from the current one");
+        }
+        account.setPasswordHash(passwordEncoder.encode(newPassword));
+        int closed = refreshTokens.revokeAllFor(account); // someone who knew the old password is logged out too
+        audit.record(username, AuditEvent.Action.PASSWORD_CHANGED, username, closed + " session(s) closed");
     }
 
     /** Public sign-up: creates the donor profile and its login (username = phone) in one transaction. */
@@ -89,6 +137,8 @@ public class AuthService {
         DonorView donor = donorService.register(req.donor());
         UserAccount account = createAccount(username, req.password(), Role.DONOR,
                 donorRepository.getReferenceById(donor.id()), null);
+        account.setLastLoginAt(LocalDateTime.now(clock));
+        audit.record(username, AuditEvent.Action.DONOR_REGISTERED, username, donor.bloodGroupLabel() + ", " + donor.city());
         return tokenFor(account);
     }
 
@@ -100,6 +150,7 @@ public class AuthService {
         HospitalView hospital = hospitalService.create(req);
         createAccount(req.loginUsername(), req.loginPassword(), Role.HOSPITAL, null,
                 hospitalRepository.getReferenceById(hospital.id()));
+        audit.record(AuditEvent.Action.HOSPITAL_CREATED, req.loginUsername(), hospital.name());
         return hospital;
     }
 

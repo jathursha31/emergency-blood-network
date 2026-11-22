@@ -46,6 +46,8 @@ public class UserAccount {
     @Column(nullable = false, columnDefinition = "integer default 0")
     private int tokenVersion;
 
+    private LocalDateTime lastLoginAt;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

@@ -1,5 +1,6 @@
 package com.blooddonor.security;
 
+import com.blooddonor.entity.AuditEvent;
 import com.blooddonor.entity.RefreshToken;
 import com.blooddonor.entity.UserAccount;
 import com.blooddonor.exception.InvalidRefreshTokenException;
@@ -41,10 +42,13 @@ public class RefreshTokenService {
     private final SecurityProperties props;
     private final Clock clock;
     private final ApplicationEventPublisher events;
+    private final AuditService audit;
     private final SecureRandom random = new SecureRandom();
 
     public RefreshTokenService(RefreshTokenRepository tokens, UserAccountRepository accounts,
-                               SecurityProperties props, Clock clock, ApplicationEventPublisher events) {
+                               SecurityProperties props, Clock clock, ApplicationEventPublisher events,
+                               AuditService audit) {
+        this.audit = audit;
         this.tokens = tokens;
         this.accounts = accounts;
         this.props = props;
@@ -77,6 +81,8 @@ public class RefreshTokenService {
                 log.warn("Refresh token reuse for '{}': revoked {} session token(s) of that login",
                         current.getAccount().getUsername(), n);
                 events.publishEvent(new SessionEvents.SessionEnded(current.getAccount().getUsername(), current.getFamily()));
+                audit.record(null, AuditEvent.Action.TOKEN_REUSE_DETECTED, current.getAccount().getUsername(),
+                        "old refresh token replayed; " + n + " session token(s) revoked");
                 throw new InvalidRefreshTokenException("This session was used somewhere else and has been closed. Please log in again.");
             }
             throw new InvalidRefreshTokenException("You have been logged out. Please log in again.");
@@ -104,6 +110,7 @@ public class RefreshTokenService {
             t.setRevokedAt(now());
             t.setRevokedReason("LOGOUT");
             events.publishEvent(new SessionEvents.SessionEnded(t.getAccount().getUsername(), t.getFamily()));
+            audit.record(t.getAccount().getUsername(), AuditEvent.Action.LOGOUT, t.getAccount().getUsername(), null);
         });
     }
 
@@ -113,10 +120,16 @@ public class RefreshTokenService {
      */
     @Transactional
     public int revokeAll(String username) {
-        return accounts.findByUsername(username).map(this::revokeAllFor).orElse(0);
+        return accounts.findByUsername(username).map(a -> {
+            int n = revokeAllFor(a);
+            audit.record(username, AuditEvent.Action.LOGOUT_ALL, username, n + " session(s) closed");
+            return n;
+        }).orElse(0);
     }
 
-    private int revokeAllFor(UserAccount account) {
+    /** End every session of the account and invalidate its access tokens (used by logout everywhere and admin actions). */
+    @Transactional
+    public int revokeAllFor(UserAccount account) {
         int n = tokens.revokeAllForAccount(account.getId(), now(), "LOGOUT_ALL");
         account.setTokenVersion(account.getTokenVersion() + 1);
         accounts.save(account);

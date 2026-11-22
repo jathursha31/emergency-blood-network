@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { hospitalApi, requestApi } from '../api/client';
+import { AuditPanel, UsersPanel } from '../components/AdminUsers';
 import AnalyticsPanel from '../components/AnalyticsPanel';
 import { StockOverview } from '../components/inventory';
 import { HospitalMap, LocationPicker } from '../components/maps';
@@ -30,12 +31,14 @@ export default function AdminDashboard() {
             {tab === 'requests' && <AdminRequests hospitals={hospitals} />}
             {tab === 'banks' && <StockOverview />}
             {tab === 'hospitals' && <AdminHospitals hospitals={hospitals} onAdded={loadHospitals} />}
+            {tab === 'users' && <UsersPanel />}
+            {tab === 'audit' && <AuditPanel />}
         </>
     );
 }
 
 const ADMIN_TABS = [['analytics', '📊 Analytics'], ['requests', '🚨 Blood requests'], ['banks', '🏦 Blood banks'],
-    ['hospitals', '🏥 Hospitals']];
+    ['hospitals', '🏥 Hospitals'], ['users', '👥 Users'], ['audit', '📜 Audit log']];
 
 function AdminRequests({ hospitals }) {
     const [selectedId, setSelectedId] = useState(null);
