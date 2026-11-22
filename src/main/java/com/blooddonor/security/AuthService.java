@@ -113,7 +113,8 @@ public class AuthService {
         return accounts.save(account);
     }
 
-    private TokenResponse tokenFor(UserAccount account) {
+    /** Access token (JWT) response for an account; used by login, sign-up and refresh. */
+    public TokenResponse tokenFor(UserAccount account) {
         JwtService.IssuedToken token = jwtService.issue(account);
         return new TokenResponse(token.value(), "Bearer", token.expiresInSeconds(), token.expiresAt(),
                 account.getUsername(), account.getRole(),

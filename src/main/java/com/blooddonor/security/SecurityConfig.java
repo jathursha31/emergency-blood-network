@@ -48,7 +48,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, SpaController.ROUTES).permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register",
-                                "/api/auth/otp/request", "/api/auth/otp/login").permitAll()
+                                "/api/auth/otp/request", "/api/auth/otp/login",
+                                // authenticated by the httpOnly refresh cookie, not by a JWT
+                                "/api/auth/refresh", "/api/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/blood-groups/**", "/api/donors/nearby",
                                 "/api/leaderboard", "/api/camps", "/api/camps/*/slots").permitAll()
                         .requestMatchers("/api/camps/**").hasAnyRole("HOSPITAL", "ADMIN")

@@ -1,12 +1,15 @@
 /**
  * Small fetch wrapper for the Spring Boot API.
- * - adds the JWT as "Authorization: Bearer ..."
+ * - adds the short-lived access token (JWT) as "Authorization: Bearer ..."
+ * - when it has expired (401), silently gets a new one with the httpOnly refresh cookie and retries once
  * - turns Spring's ProblemDetail errors into readable messages
- * - calls onUnauthorized() when the token has expired
+ * - calls onUnauthorized() when the session can't be renewed
  */
 
 let token = null;
 let onUnauthorized = () => {};
+let onRefreshed = () => {};
+let refreshing = null;
 
 export function setToken(t) {
     token = t;
@@ -16,6 +19,32 @@ export function setUnauthorizedHandler(fn) {
     onUnauthorized = fn;
 }
 
+/** Called with the new TokenResponse after a silent refresh, so the app can store it. */
+export function setRefreshedHandler(fn) {
+    onRefreshed = fn;
+}
+
+/**
+ * Swap the refresh cookie for a new access token. Concurrent callers share one request,
+ * because the server rotates the cookie and a second parallel refresh would look like token theft.
+ * Resolves to the new access token, or null when the session is over.
+ */
+export function refreshAccessToken() {
+    if (!refreshing) {
+        refreshing = fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' })
+            .then(async (res) => {
+                if (!res.ok) return null;
+                const t = await res.json();
+                token = t.accessToken;
+                onRefreshed(t);
+                return t.accessToken;
+            })
+            .catch(() => null)
+            .finally(() => { refreshing = null; });
+    }
+    return refreshing;
+}
+
 export class ApiError extends Error {
     constructor(message, status) {
         super(message);
@@ -23,7 +52,7 @@ export class ApiError extends Error {
     }
 }
 
-export async function api(method, path, body) {
+export async function api(method, path, body, isRetry = false) {
     const headers = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = 'Bearer ' + token;
@@ -39,7 +68,8 @@ export async function api(method, path, body) {
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
-    if (res.status === 401 && token && !path.startsWith('/api/auth/')) {
+    if (res.status === 401 && token && !path.startsWith('/api/auth/') || (res.status === 401 && path === '/api/auth/logout-all')) {
+        if (!isRetry && await refreshAccessToken()) return api(method, path, body, true);
         onUnauthorized();
         throw new ApiError('Your session has expired. Please log in again.', 401);
     }
@@ -60,6 +90,8 @@ export const authApi = {
     login: (username, password) => api('POST', '/api/auth/login', { username, password }),
     register: (donor, password, otpCode) => api('POST', '/api/auth/register', { donor, password, otpCode }),
     requestOtp: (phone, purpose) => api('POST', '/api/auth/otp/request', { phone, purpose }),
+    logout: () => fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {}),
+    logoutAll: () => api('POST', '/api/auth/logout-all'),
     otpLogin: (phone, code) => api('POST', '/api/auth/otp/login', { phone, code }),
 };
 

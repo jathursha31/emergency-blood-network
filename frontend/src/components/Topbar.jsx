@@ -1,13 +1,29 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useLiveStatus } from '../hooks/live';
+import { useToast } from './Toast';
 
 const ROLE_NAME = { DONOR: 'Donor', HOSPITAL: 'Hospital', ADMIN: 'Admin' };
 
 export default function Topbar() {
-    const { session, logout } = useAuth();
+    const { session, logout, logoutEverywhere } = useAuth();
     const navigate = useNavigate();
+    const toast = useToast();
     const live = useLiveStatus();
+
+    const signOut = async () => {
+        await logout();
+        navigate('/login');
+    };
+
+    const signOutEverywhere = async () => {
+        if (!window.confirm('Log out on every phone and computer where you are signed in?')) return;
+        try {
+            const n = await logoutEverywhere();
+            toast(`Logged out of ${n} session${n === 1 ? '' : 's'}.`, 'ok');
+            navigate('/login');
+        } catch (e) { toast(e.message, 'error'); }
+    };
 
     return (
         <header className="topbar">
@@ -21,7 +37,9 @@ export default function Topbar() {
                           title={live ? 'Live updates on' : 'Reconnecting… (data still refreshes every 20 s)'}>
                         {live ? 'Live' : 'Offline'}</span>
                     <span><b>{session.displayName}</b> · {ROLE_NAME[session.role]}</span>
-                    <button className="btn secondary small" onClick={() => { logout(); navigate('/login'); }}>Log out</button>
+                    <button className="btn secondary small" onClick={signOut}>Log out</button>
+                    <button className="linkbtn small" onClick={signOutEverywhere}
+                            title="End every session of this account, on all devices">All devices</button>
                 </div>
             )}
         </header>

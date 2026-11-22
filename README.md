@@ -12,6 +12,8 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | Feature | How it works |
 |---|---|
 | JWT security | Stateless Spring Security with HS256-signed tokens (Nimbus). BCrypt password hashes. Three roles, plus ownership checks: a hospital only sees its own requests, and a donor's id always comes from the token. |
+| Sessions | 15-minute access tokens plus a 14-day refresh token in an **httpOnly, SameSite=Strict cookie** that JavaScript can't read. Refresh tokens are stored hashed and **rotated on every use**. Replaying an old one revokes every session from that login (theft detection). Logout revokes the token, and "All devices" ends every session. The browser renews tokens silently. |
+| Sessions | 15-minute access tokens plus a 14-day refresh token in an **httpOnly, SameSite=Strict cookie** (JavaScript can't read it). Refresh tokens are stored hashed and **rotated on every use**. Replaying an old one revokes every session from that login (theft detection). Logout revokes the token, and "All devices" ends every session. The browser renews tokens silently. |
 | Blood compatibility | `BloodGroup` encodes A/B/Rh antigens. A B+ patient gets B+, B-, O+, O- donors. Exact-group donors are listed first so universal O- blood is saved. |
 | Geo search | A lat/lng bounding-box query in PostgreSQL narrows the candidates, then the Haversine formula gives exact km. Works on plain PostgreSQL, no extension needed. |
 | Eligibility rules | Donation gap of at least 90 days, age 18–65, and the donor's availability switch. All rules are configurable. |
@@ -174,6 +176,9 @@ These defaults are for local development only. Elsewhere, set the `JWT_SECRET` (
 | POST | `/api/auth/register` | public | Donor sign-up with `otpCode`, returns a token |
 | POST | `/api/auth/login` | public | Login, returns a token |
 | POST | `/api/auth/otp/login` | public | Donor login with `{"phone","code"}` instead of a password |
+| POST | `/api/auth/refresh` | refresh cookie | New access token; rotates the cookie |
+| POST | `/api/auth/logout` | refresh cookie | Log out on this device |
+| POST | `/api/auth/logout-all` | any logged in | Log out on every device |
 | GET | `/api/live` | any logged in | Server-Sent Events stream of live updates |
 | GET | `/api/me/rewards` | DONOR | Badge, donations, lives helped, rank |
 | GET/POST | `/api/me/camp-bookings` (+ `/{id}/cancel`) | DONOR | My camp passes, book a slot |
@@ -279,15 +284,17 @@ app.initial-radius-km=10
 app.radius-step-km=10
 app.max-radius-km=50
 app.expand-after-minutes=30
-app.security.jwt-expiry-minutes=120
+app.security.jwt-expiry-minutes=15
+app.security.refresh-token-days=14
+app.security.cookie-secure=false      # set COOKIE_SECURE=true when served over https
 jobs.expand-search.cron=0 */5 * * * *
 jobs.eligibility-reminder.cron=0 0 9 * * *
+jobs.refresh-token-cleanup.cron=0 30 3 * * *
 ```
 
 ## Ideas to extend
 
-- Refresh tokens and logout (token blacklist)
+- Revoking access tokens instantly (a denylist or token-version check), not only when they expire after 15 minutes
 - PostGIS `geography` column and `ST_DWithin` for very large donor tables
 - An Indian SMS gateway with DLT templates (MSG91, Fast2SMS)
-- Scanning the camp QR pass with the phone camera at check-in
 - Analytics as SQL aggregate queries or a reporting table for large data

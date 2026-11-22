@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { refreshAccessToken } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
 /**
@@ -48,7 +49,12 @@ export function LiveProvider({ children }) {
                         headers: { Authorization: 'Bearer ' + token, Accept: 'text/event-stream' },
                         signal: controller.signal,
                     });
-                    if (res.status === 401 || res.status === 403) return; // token expired: AuthContext will log out
+                    if (res.status === 401 || res.status === 403) {
+                        // access token expired: renew it; the new token re-runs this effect and reconnects.
+                        // If the session is over, the next API call logs the user out.
+                        refreshAccessToken();
+                        return;
+                    }
                     if (!res.ok || !res.body) throw new Error('live stream ' + res.status);
                     setConnected(true);
                     delay = 2000;

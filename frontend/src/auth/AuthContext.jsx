@@ -1,13 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { authApi, donorApi, hospitalApi, setToken, setUnauthorizedHandler } from '../api/client';
+import { authApi, donorApi, hospitalApi, setRefreshedHandler, setToken, setUnauthorizedHandler } from '../api/client';
 
 const STORAGE_KEY = 'bdn.session';
 const AuthContext = createContext(null);
 
+/**
+ * The stored session holds the short-lived access token and who is logged in.
+ * It is kept even after the access token expires: the httpOnly refresh cookie (which JavaScript
+ * can't see) renews it on the first 401. If the cookie is gone too, the user is sent to login.
+ */
 function loadSession() {
     try {
-        const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
-        if (s && s.expiresAt && new Date(s.expiresAt) > new Date()) return s;
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null;
     } catch { /* storage unavailable */ }
     return null;
 }
@@ -30,15 +34,38 @@ export function AuthProvider({ children }) {
     });
     const [expired, setExpired] = useState(false);
 
-    const logout = useCallback(() => {
+    /** Forget the session in this browser only (the server already rejected it). */
+    const endSession = useCallback(() => {
         setToken(null);
         persist(null);
         setSession(null);
     }, []);
 
+    /** Log out on this device: the server revokes the refresh cookie too. */
+    const logout = useCallback(async () => {
+        await authApi.logout();
+        endSession();
+    }, [endSession]);
+
+    /** Log out on every device where this account is signed in. Returns how many sessions were closed. */
+    const logoutEverywhere = useCallback(async () => {
+        const res = await authApi.logoutAll();
+        endSession();
+        return res.sessionsClosed;
+    }, [endSession]);
+
     useEffect(() => {
-        setUnauthorizedHandler(() => { setExpired(true); logout(); });
-    }, [logout]);
+        setUnauthorizedHandler(() => { setExpired(true); endSession(); });
+        // a silent refresh brought a new access token: keep it
+        setRefreshedHandler((t) => {
+            setSession(prev => {
+                if (!prev || prev.username !== t.username) return prev;
+                const next = { ...prev, accessToken: t.accessToken, expiresAt: t.expiresAt };
+                persist(next);
+                return next;
+            });
+        });
+    }, [endSession]);
 
     /** Store the token from /login or /register, then fetch a friendly display name. */
     const startSession = useCallback(async (t) => {
@@ -67,8 +94,8 @@ export function AuthProvider({ children }) {
     const loginWithOtp = useCallback(async (phone, code) =>
         startSession(await authApi.otpLogin(phone, code)), [startSession]);
 
-    const value = useMemo(() => ({ session, login, loginWithOtp, register, logout, expired }),
-        [session, login, loginWithOtp, register, logout, expired]);
+    const value = useMemo(() => ({ session, login, loginWithOtp, register, logout, logoutEverywhere, expired }),
+        [session, login, loginWithOtp, register, logout, logoutEverywhere, expired]);
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

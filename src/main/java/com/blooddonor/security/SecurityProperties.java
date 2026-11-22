@@ -12,7 +12,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record SecurityProperties(
         /* HMAC-SHA256 key, at least 32 characters */
         @DefaultValue("dev-only-secret-change-me-0123456789abcdef") String jwtSecret,
-        @DefaultValue("120") long jwtExpiryMinutes,
+        /* access token lifetime; short, because it can't be revoked before it expires */
+        @DefaultValue("15") long jwtExpiryMinutes,
+        /* refresh token (httpOnly cookie) lifetime */
+        @DefaultValue("14") long refreshTokenDays,
+        /* send the refresh cookie only over https; must be true in production */
+        @DefaultValue("false") boolean cookieSecure,
         /* created on startup if no ADMIN account exists */
         @DefaultValue("admin") String adminUsername,
         @DefaultValue("admin123") String adminPassword
