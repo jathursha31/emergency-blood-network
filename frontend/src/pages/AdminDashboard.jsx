@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { hospitalApi, requestApi } from '../api/client';
+import { StockOverview } from '../components/inventory';
 import { HospitalMap, LocationPicker } from '../components/maps';
 import { RequestForm, RequestsPanel } from '../components/requests';
 import { useToast } from '../components/Toast';
@@ -19,15 +20,18 @@ export default function AdminDashboard() {
     return (
         <>
             <div className="tabs">
-                <button className={`tab ${tab === 'requests' ? 'active' : ''}`} onClick={() => setTab('requests')}>Blood requests</button>
-                <button className={`tab ${tab === 'hospitals' ? 'active' : ''}`} onClick={() => setTab('hospitals')}>Hospitals</button>
+                {ADMIN_TABS.map(([key, label]) => (
+                    <button key={key} className={`tab ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>{label}</button>
+                ))}
             </div>
-            {tab === 'requests'
-                ? <AdminRequests hospitals={hospitals} />
-                : <AdminHospitals hospitals={hospitals} onAdded={loadHospitals} />}
+            {tab === 'requests' && <AdminRequests hospitals={hospitals} />}
+            {tab === 'banks' && <StockOverview />}
+            {tab === 'hospitals' && <AdminHospitals hospitals={hospitals} onAdded={loadHospitals} />}
         </>
     );
 }
+
+const ADMIN_TABS = [['requests', '🚨 Blood requests'], ['banks', '🏦 Blood banks'], ['hospitals', '🏥 Hospitals']];
 
 function AdminRequests({ hospitals }) {
     const [selectedId, setSelectedId] = useState(null);

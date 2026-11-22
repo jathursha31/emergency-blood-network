@@ -112,6 +112,7 @@ function RequestRow({ r, selected, showHospital, onClick }) {
                 <div className="row">
                     <BloodDrop small label={r.bloodGroupLabel} />
                     <div><b>{r.patientName}</b> <span className="small muted">#{r.id}</span>
+                        {r.restock && <span className="badge b-blue" style={{ marginLeft: '.35rem' }}>🔁 Restock</span>}
                         {showHospital && <div className="small muted">{r.hospitalName}</div>}</div>
                 </div>
                 <div className="row"><Badge value={r.urgency} /> <Badge value={r.status} /></div>

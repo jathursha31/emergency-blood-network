@@ -57,6 +57,10 @@ public class BloodRequest {
 
     private LocalDateTime closedAt;
 
+    /** Raised automatically by the blood bank because stock fell below its minimum. Donations go into stock. */
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean restock;
+
     @OneToMany(mappedBy = "request", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DonorResponse> responses = new ArrayList<>();
 

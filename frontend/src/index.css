@@ -199,3 +199,17 @@ a.tab { text-decoration: none; display: inline-block; }
 .badge-tile small { font-size: .7rem; color: var(--muted); }
 .badge-tile.earned { filter: none; opacity: 1; border-color: #f2c94c; background: #fffbea; }
 tr.highlight td { background: var(--red-soft); }
+
+/* ---------- blood bank ---------- */
+.stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: .6rem; }
+.stock-card { border: 1px solid var(--line); border-radius: 10px; padding: .7rem .8rem; background: #fff; }
+.stock-card.alert { border-color: #f5c27a; background: #fffaf2; }
+.stock-card.alert.level-empty { border-color: #f2a3ab; background: #fff6f7; }
+.stock-units { margin: .35rem 0; font-size: .9rem; }
+.stock-units b { font-size: 1.6rem; }
+.progress.warn > div { background: var(--amber); }
+.stock-actions { margin-top: .5rem; gap: .3rem; }
+.stock-actions input { width: 3.6rem; padding: .3rem .4rem; }
+.stock-edit { margin-top: .5rem; display: grid; gap: .4rem; }
+.stock-edit label { font-size: .78rem; margin: 0; }
+.cell-low { background: var(--amber-soft); color: var(--amber); font-weight: 700; }

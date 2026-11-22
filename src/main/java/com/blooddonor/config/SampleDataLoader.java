@@ -6,6 +6,9 @@ import com.blooddonor.entity.Hospital;
 import com.blooddonor.repository.DonorRepository;
 import com.blooddonor.entity.Role;
 import com.blooddonor.repository.HospitalRepository;
+import com.blooddonor.repository.BloodStockRepository;
+import com.blooddonor.entity.BloodStock;
+import java.util.List;
 import com.blooddonor.repository.UserAccountRepository;
 import com.blooddonor.security.AuthService;
 import org.slf4j.Logger;
@@ -34,13 +37,16 @@ public class SampleDataLoader implements ApplicationRunner {
     private final DonorRepository donorRepository;
     private final UserAccountRepository accounts;
     private final AuthService authService;
+    private final BloodStockRepository stockRepository;
 
     public SampleDataLoader(HospitalRepository hospitalRepository, DonorRepository donorRepository,
-                            UserAccountRepository accounts, AuthService authService) {
+                            UserAccountRepository accounts, AuthService authService,
+                            BloodStockRepository stockRepository) {
         this.hospitalRepository = hospitalRepository;
         this.donorRepository = donorRepository;
         this.accounts = accounts;
         this.authService = authService;
+        this.stockRepository = stockRepository;
     }
 
     @Override
@@ -50,6 +56,33 @@ public class SampleDataLoader implements ApplicationRunner {
             loadHospitalsAndDonors();
         }
         createMissingLogins();
+        if (stockRepository.count() == 0) {
+            loadBloodBankStock();
+        }
+    }
+
+    /** Starting stock for the sample hospitals: min 4 units per group, a couple of groups already low. */
+    private void loadBloodBankStock() {
+        int[][] unitsPerHospital = {
+                // O-  O+  A-  A+  B-  B+  AB- AB+
+                {6, 14, 3, 11, 2, 9, 1, 5},
+                {4, 10, 5, 8, 3, 6, 2, 4},
+                {8, 12, 4, 9, 5, 2, 3, 6},
+        };
+        List<Hospital> hospitals = hospitalRepository.findAll().stream()
+                .sorted(java.util.Comparator.comparing(Hospital::getId)).limit(3).toList();
+        for (int i = 0; i < hospitals.size(); i++) {
+            BloodGroup[] groups = BloodGroup.values();
+            for (int g = 0; g < groups.length; g++) {
+                BloodStock s = new BloodStock();
+                s.setHospital(hospitals.get(i));
+                s.setBloodGroup(groups[g]);
+                s.setUnits(unitsPerHospital[i][g]);
+                s.setMinUnits(4);
+                stockRepository.save(s);
+            }
+        }
+        log.info("Sample blood bank stock loaded for {} hospital(s)", hospitals.size());
     }
 
     /**

@@ -64,7 +64,9 @@ public final class RequestDtos {
             long notifiedCount,
             long acceptedCount,
             long donatedCount,
-            List<ResponseView> donors
+            List<ResponseView> donors,
+            /* raised automatically by the blood bank */
+            boolean restock
     ) {
     }
 

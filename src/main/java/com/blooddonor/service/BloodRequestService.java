@@ -12,7 +12,9 @@ import com.blooddonor.exception.NotFoundException;
 import com.blooddonor.repository.BloodRequestRepository;
 import com.blooddonor.repository.DonorRepository;
 import com.blooddonor.repository.DonorResponseRepository;
+import com.blooddonor.service.events.DonationEvents;
 import com.blooddonor.util.GeoUtils;
+import org.springframework.context.ApplicationEventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -46,6 +48,7 @@ public class BloodRequestService {
     private final NotificationService notifier;
     private final AppProperties props;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public BloodRequestService(BloodRequestRepository requestRepository,
                                DonorRepository donorRepository,
@@ -55,7 +58,9 @@ public class BloodRequestService {
                                EligibilityService eligibilityService,
                                NotificationService notifier,
                                AppProperties props,
-                               Clock clock) {
+                               Clock clock,
+                               ApplicationEventPublisher events) {
+        this.events = events;
         this.requestRepository = requestRepository;
         this.donorRepository = donorRepository;
         this.responseRepository = responseRepository;
@@ -70,6 +75,16 @@ public class BloodRequestService {
     // ---------------------------------------------------------------- create & read
 
     public BloodRequestView create(CreateBloodRequest req) {
+        return create(req, false);
+    }
+
+    /** Raised by the blood bank when stock falls below its minimum. */
+    public BloodRequestView createRestock(Long hospitalId, BloodGroup group, int units, Urgency urgency) {
+        return create(new CreateBloodRequest(hospitalId, "Blood bank restock", group, units, urgency,
+                now().plusHours(48)), true);
+    }
+
+    private BloodRequestView create(CreateBloodRequest req, boolean restock) {
         if (req.hospitalId() == null) {
             throw new IllegalArgumentException("hospitalId is required");
         }
@@ -83,6 +98,7 @@ public class BloodRequestService {
         request.setUrgency(req.urgency());
         request.setNeededBy(req.neededBy());
         request.setCreatedAt(now());
+        request.setRestock(restock);
         double radius = req.urgency() == Urgency.CRITICAL ? props.initialRadiusKm() * 2 : props.initialRadiusKm();
         request.setSearchRadiusKm(Math.min(radius, props.maxRadiusKm()));
         requestRepository.save(request);
@@ -220,6 +236,10 @@ public class BloodRequestService {
         response.setStatus(ResponseStatus.DONATED);
         response.setDonatedAt(now());
         response.getDonor().setLastDonationDate(eligibilityService.today());
+        if (request.isRestock()) {
+            events.publishEvent(new DonationEvents.UnitsCollected(request.getHospital().getId(),
+                    response.getDonor().getBloodGroup(), 1, "restock request #" + request.getId()));
+        }
         notifier.send(response.getDonor().getPhone(),
                 "Thank you for donating blood at " + request.getHospital().getName()
                         + "! You can donate again after " + props.minDaysBetweenDonations() + " days.");
@@ -353,7 +373,8 @@ public class BloodRequestService {
                 r.getResponses().size(),
                 r.countResponses(ResponseStatus.ACCEPTED),
                 r.countResponses(ResponseStatus.DONATED),
-                donors);
+                donors,
+                r.isRestock());
     }
 
     private RequestDtos.DonorInboxItem toInboxItem(DonorResponse resp) {

@@ -52,7 +52,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/hospitals").hasRole("ADMIN")
                         .requestMatchers("/api/donors/**").hasRole("ADMIN")
                         // hospitals (own data only, checked in controller) and admin
-                        .requestMatchers("/api/requests/**").hasAnyRole("HOSPITAL", "ADMIN")
+                        .requestMatchers("/api/requests/**", "/api/inventory/**").hasAnyRole("HOSPITAL", "ADMIN")
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(roleConverter())));
         return http.build();

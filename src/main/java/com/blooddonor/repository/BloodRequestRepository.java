@@ -1,5 +1,6 @@
 package com.blooddonor.repository;
 
+import com.blooddonor.entity.BloodGroup;
 import com.blooddonor.entity.BloodRequest;
 import com.blooddonor.entity.RequestStatus;
 import jakarta.persistence.LockModeType;
@@ -34,4 +35,7 @@ public interface BloodRequestRepository extends JpaRepository<BloodRequest, Long
     List<BloodRequest> findByStatusInAndNeededByBefore(Collection<RequestStatus> statuses, LocalDateTime time);
 
     List<BloodRequest> findByStatusAndLastSearchAtBefore(RequestStatus status, LocalDateTime time);
+
+    Optional<BloodRequest> findFirstByHospitalIdAndBloodGroupAndRestockTrueAndStatusIn(
+            Long hospitalId, BloodGroup bloodGroup, Collection<RequestStatus> statuses);
 }

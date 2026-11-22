@@ -79,6 +79,16 @@ export const requestApi = {
     markDonated: (id, donorId) => api('POST', `/api/requests/${id}/donors/${donorId}/donated`),
 };
 
+const hq = (hospitalId) => (hospitalId ? `?hospitalId=${hospitalId}` : '');
+
+export const inventoryApi = {
+    list: (hospitalId) => api('GET', `/api/inventory${hq(hospitalId)}`),
+    overview: () => api('GET', '/api/inventory/overview'),
+    update: (group, body, hospitalId) => api('PUT', `/api/inventory/${group}${hq(hospitalId)}`, body),
+    use: (group, units, hospitalId) => api('POST', `/api/inventory/${group}/use${hq(hospitalId)}`, { units }),
+    add: (group, units, hospitalId) => api('POST', `/api/inventory/${group}/add${hq(hospitalId)}`, { units }),
+};
+
 export const hospitalApi = {
     list: () => api('GET', '/api/hospitals'),
     get: (id) => api('GET', `/api/hospitals/${id}`),
