@@ -21,6 +21,8 @@ public class TwilioSmsSender implements SmsSender {
     private final RestClient http;
     private final String accountSid;
     private final String fromNumber;
+    /** WhatsApp uses the same API; both numbers just get a "whatsapp:" prefix. */
+    private final boolean whatsapp;
 
     @Autowired
     public TwilioSmsSender(SmsProperties props) {
@@ -37,6 +39,7 @@ public class TwilioSmsSender implements SmsSender {
         }
         this.accountSid = t.accountSid();
         this.fromNumber = t.fromNumber();
+        this.whatsapp = "whatsapp".equalsIgnoreCase(props.channel());
         this.http = builder
                 .baseUrl(t.apiBaseUrl())
                 .defaultHeaders(h -> h.setBasicAuth(t.accountSid(), t.authToken()))
@@ -46,8 +49,9 @@ public class TwilioSmsSender implements SmsSender {
     @Override
     public void send(String e164Phone, String text) {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("To", e164Phone);
-        form.add("From", fromNumber);
+        String prefix = whatsapp ? "whatsapp:" : "";
+        form.add("To", prefix + e164Phone);
+        form.add("From", prefix + fromNumber);
         form.add("Body", text);
 
         http.post()
@@ -60,6 +64,6 @@ public class TwilioSmsSender implements SmsSender {
 
     @Override
     public String name() {
-        return "twilio";
+        return whatsapp ? "twilio-whatsapp" : "twilio";
     }
 }

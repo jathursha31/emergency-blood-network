@@ -37,6 +37,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       # SMS: "log" (default) or "twilio" (see README, "SMS notifications")
       SMS_PROVIDER: ${SMS_PROVIDER:-log}
+      SMS_CHANNEL: ${SMS_CHANNEL:-sms}
       SMS_ALLOWED_NUMBERS: ${SMS_ALLOWED_NUMBERS:-}
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}

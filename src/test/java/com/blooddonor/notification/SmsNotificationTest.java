@@ -22,7 +22,11 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class SmsNotificationTest {
 
     private static SmsProperties props(String provider, List<String> allowed) {
-        return new SmsProperties(provider, "+91", allowed,
+        return props(provider, "sms", allowed);
+    }
+
+    private static SmsProperties props(String provider, String channel, List<String> allowed) {
+        return new SmsProperties(provider, channel, "+91", allowed,
                 new SmsProperties.Twilio("AC123", "secret", "+15005550006", "https://api.twilio.com"));
     }
 
@@ -106,6 +110,21 @@ class SmsNotificationTest {
     }
 
     @Test
+    void whatsappChannelPrefixesBothNumbers() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer twilio = MockRestServiceServer.bindTo(builder).build();
+        twilio.expect(requestTo("https://api.twilio.com/2010-04-01/Accounts/AC123/Messages.json"))
+                .andExpect(content().formDataContains(java.util.Map.of(
+                        "To", "whatsapp:+919840000001", "From", "whatsapp:+15005550006")))
+                .andRespond(withSuccess("{\"sid\":\"SM1\"}", MediaType.APPLICATION_JSON));
+
+        TwilioSmsSender sender = new TwilioSmsSender(props("twilio", "whatsapp", List.of()), builder);
+        sender.send("+919840000001", "Blood needed");
+        twilio.verify();
+        assertThat(sender.name()).isEqualTo("twilio-whatsapp");
+    }
+
+    @Test
     void twilioErrorIsRaisedToTheCaller() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer twilio = MockRestServiceServer.bindTo(builder).build();
@@ -120,7 +139,7 @@ class SmsNotificationTest {
 
     @Test
     void twilioNeedsCredentials() {
-        SmsProperties missing = new SmsProperties("twilio", "+91", List.of(),
+        SmsProperties missing = new SmsProperties("twilio", "sms", "+91", List.of(),
                 new SmsProperties.Twilio("", "", "", "https://api.twilio.com"));
         assertThatThrownBy(() -> new TwilioSmsSender(missing))
                 .isInstanceOf(IllegalStateException.class)

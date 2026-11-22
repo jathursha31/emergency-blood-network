@@ -10,6 +10,7 @@ import java.util.List;
  *
  * <pre>
  * app.sms.provider=log | twilio
+ * app.sms.channel=sms | whatsapp
  * app.sms.country-code=+91
  * app.sms.allowed-numbers=+919876543210,+919812345678   (empty = send to everyone)
  * app.sms.twilio.account-sid=AC...
@@ -21,6 +22,8 @@ import java.util.List;
 public record SmsProperties(
         /* "log" only writes messages to the console; "twilio" really sends them */
         @DefaultValue("log") String provider,
+        /* "sms" or "whatsapp" (Twilio sends both through the same Messages API) */
+        @DefaultValue("sms") String channel,
         /* prefix added to 10-digit local numbers */
         @DefaultValue("+91") String countryCode,
         /*
