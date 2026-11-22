@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { hospitalApi, requestApi } from '../api/client';
+import AnalyticsPanel from '../components/AnalyticsPanel';
 import { StockOverview } from '../components/inventory';
 import { HospitalMap, LocationPicker } from '../components/maps';
 import { RequestForm, RequestsPanel } from '../components/requests';
@@ -9,7 +10,7 @@ import { useLiveEvents } from '../hooks/live';
 import { usePolling } from '../hooks/usePolling';
 
 export default function AdminDashboard() {
-    const [tab, setTab] = useState('requests');
+    const [tab, setTab] = useState('analytics');
     const [hospitals, setHospitals] = useState([]);
     const toast = useToast();
 
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
                     <button key={key} className={`tab ${tab === key ? 'active' : ''}`} onClick={() => setTab(key)}>{label}</button>
                 ))}
             </div>
+            {tab === 'analytics' && <AnalyticsPanel />}
             {tab === 'requests' && <AdminRequests hospitals={hospitals} />}
             {tab === 'banks' && <StockOverview />}
             {tab === 'hospitals' && <AdminHospitals hospitals={hospitals} onAdded={loadHospitals} />}
@@ -32,7 +34,8 @@ export default function AdminDashboard() {
     );
 }
 
-const ADMIN_TABS = [['requests', '🚨 Blood requests'], ['banks', '🏦 Blood banks'], ['hospitals', '🏥 Hospitals']];
+const ADMIN_TABS = [['analytics', '📊 Analytics'], ['requests', '🚨 Blood requests'], ['banks', '🏦 Blood banks'],
+    ['hospitals', '🏥 Hospitals']];
 
 function AdminRequests({ hospitals }) {
     const [selectedId, setSelectedId] = useState(null);

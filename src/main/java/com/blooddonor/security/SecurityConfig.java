@@ -55,7 +55,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/me/**").hasRole("DONOR")
                         // admin
                         .requestMatchers(HttpMethod.POST, "/api/hospitals").hasRole("ADMIN")
-                        .requestMatchers("/api/donors/**").hasRole("ADMIN")
+                        .requestMatchers("/api/donors/**", "/api/admin/**").hasRole("ADMIN")
                         // hospitals (own data only, checked in controller) and admin
                         .requestMatchers("/api/requests/**", "/api/inventory/**").hasAnyRole("HOSPITAL", "ADMIN")
                         .anyRequest().authenticated())
