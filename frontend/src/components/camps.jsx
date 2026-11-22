@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { campApi } from '../api/client';
 import { useLiveEvents } from '../hooks/live';
 import { usePolling } from '../hooks/usePolling';
 import { LocationPicker } from './maps';
+import { QrScannerDialog } from './QrScanner';
 import { useToast } from './Toast';
 import { AsyncButton, Badge, Empty, readForm } from './ui';
 import { fmtDate, fmtDateTime } from '../utils/format';
@@ -194,11 +195,16 @@ function CheckInCard({ onDone }) {
     const toast = useToast();
     const [code, setCode] = useState('');
     const [last, setLast] = useState(null);
+    const [scanning, setScanning] = useState(false);
 
-    const submit = async (e) => {
-        e.preventDefault();
+    const checkIn = async (value) => {
+        const clean = value.trim().toUpperCase();
+        if (!/^[A-Z0-9]{8}$/.test(clean)) {
+            toast(`"${value.slice(0, 20)}" is not a camp pass code`, 'error');
+            return;
+        }
         try {
-            const row = await campApi.checkIn(code.trim());
+            const row = await campApi.checkIn(clean);
             setLast(row);
             setCode('');
             toast(`${row.donorName} (${row.bloodGroup}) checked in. Donation recorded, +1 unit in stock.`, 'ok');
@@ -206,16 +212,22 @@ function CheckInCard({ onDone }) {
         } catch (err) { toast(err.message, 'error'); }
     };
 
+    const onScan = useCallback((text) => { setScanning(false); checkIn(text); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const closeScanner = useCallback(() => setScanning(false), []);
+
     return (
         <section className="card">
             <h2>✅ Camp check-in</h2>
-            <form onSubmit={submit} className="row">
-                <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="Code on donor's pass"
+            <button className="btn block" type="button" onClick={() => setScanning(true)} style={{ marginBottom: '.6rem' }}>
+                📷 Scan donor's QR pass</button>
+            <form onSubmit={(e) => { e.preventDefault(); checkIn(code); }} className="row">
+                <input value={code} onChange={e => setCode(e.target.value.toUpperCase())} placeholder="or type the code"
                        maxLength={12} required style={{ flex: 1, letterSpacing: '.15em', fontWeight: 700 }} />
-                <button className="btn" type="submit">Check in</button>
+                <button className="btn secondary" type="submit">Check in</button>
             </form>
-            <p className="hint">Type the 8-character code shown under the donor's QR code.</p>
+            <p className="hint">The 8-character code is printed under the donor's QR code.</p>
             {last && <p className="small">Last: <b>{last.donorName}</b> · {last.bloodGroup} · {hhmm(last.slotTime)} slot</p>}
+            {scanning && <QrScannerDialog title="Scan the donor's camp pass" onScan={onScan} onClose={closeScanner} />}
         </section>
     );
 }
