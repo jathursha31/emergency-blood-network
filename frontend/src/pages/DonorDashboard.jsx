@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { donorApi } from '../api/client';
 import { CampsForDonor, MyCampBookings } from '../components/camps';
 import PushAlerts from '../components/PushAlerts';
+import { ChatButton, ChatDialog, useChatUnread } from '../components/Chat';
 import { Leaderboard, RewardsCard } from '../components/rewards';
 import { useToast } from '../components/Toast';
 import { AsyncButton, Badge, BloodDrop, Empty } from '../components/ui';
@@ -20,8 +21,18 @@ const TABS = [['requests', '🚨 Requests'], ['camps', '⛺ Camps'], ['leaderboa
 
 export default function DonorDashboard() {
     const { data, error, loading, reload } = usePolling(loadDonorData);
-    const [params] = useSearchParams();   // ?tab=camps when opened from a camp notification
+    const [params, setParams] = useSearchParams();   // ?tab=camps / ?chat=<requestId> when opened from a notification
     const [tab, setTab] = useState(TABS.some(([k]) => k === params.get('tab')) ? params.get('tab') : 'requests');
+    const [chatWith, setChatWith] = useState(() => Number(params.get('chat')) || null);
+    const unread = useChatUnread('donor', (d) => {
+        if (d.requestId !== chatWith) toast(`💬 New message from the hospital (request #${d.requestId})`, 'ok');
+    });
+    const openChat = (requestId) => { setTab('requests'); setChatWith(requestId); };
+    const closeChat = () => {
+        setChatWith(null);
+        unread.refresh();
+        if (params.has('chat')) { params.delete('chat'); setParams(params, { replace: true }); }
+    };
     const [bookingsVersion, setBookingsVersion] = useState(0);
     const toast = useToast();
 
@@ -61,7 +72,7 @@ export default function DonorDashboard() {
                             <h2>Requests near me</h2>
                             <button className="btn secondary small" onClick={reload}>↻ Refresh</button>
                         </div>
-                        <Inbox items={data.inbox} reload={reload} />
+                        <Inbox items={data.inbox} reload={reload} unread={unread} onChat={openChat} />
                     </section>
                 )}
                 {tab === 'camps' && (
@@ -73,6 +84,7 @@ export default function DonorDashboard() {
                 )}
                 {tab === 'leaderboard' && <Leaderboard limit={20} highlightRank={data.rewards.leaderboardRank} />}
             </div>
+            {chatWith && <ChatDialog side="donor" requestId={chatWith} onClose={closeChat} />}
         </div>
     );
 }
@@ -130,7 +142,7 @@ function ProfileCard({ me, eligibility, reload }) {
     );
 }
 
-function Inbox({ items, reload }) {
+function Inbox({ items, reload, unread, onChat }) {
     if (!items.length) {
         return <Empty>No requests yet. When a nearby hospital needs your blood group, it will show up here.</Empty>;
     }
@@ -141,13 +153,13 @@ function Inbox({ items, reload }) {
     return (
         <div className="list">
             {active.length
-                ? active.map(i => <InboxItem key={i.requestId} item={i} active reload={reload} />)
+                ? active.map(i => <InboxItem key={i.requestId} item={i} active reload={reload} unread={unread} onChat={onChat} />)
                 : <Empty>No open requests for you right now.</Empty>}
             {past.length > 0 && (
                 <details style={{ marginTop: '.5rem' }}>
                     <summary className="small muted">Past requests ({past.length})</summary>
                     <div className="list" style={{ marginTop: '.5rem' }}>
-                        {past.map(i => <InboxItem key={i.requestId} item={i} reload={reload} />)}
+                        {past.map(i => <InboxItem key={i.requestId} item={i} reload={reload} unread={unread} onChat={onChat} />)}
                     </div>
                 </details>
             )}
@@ -155,7 +167,7 @@ function Inbox({ items, reload }) {
     );
 }
 
-function InboxItem({ item: i, active, reload }) {
+function InboxItem({ item: i, active, reload, unread, onChat }) {
     const toast = useToast();
     const canAccept = active && i.myStatus === 'NOTIFIED' && i.requestStatus === 'OPEN';
     const alreadyFilled = active && i.myStatus === 'NOTIFIED' && i.requestStatus === 'MATCHED';
@@ -195,13 +207,15 @@ function InboxItem({ item: i, active, reload }) {
                 <span className="small muted">request {i.requestStatus.toLowerCase()}</span>
                 <span className="spacer" />
                 {i.hospitalPhone && <a className="btn secondary small" href={`tel:${i.hospitalPhone}`}>📞 {i.hospitalPhone}</a>}
+                {(i.myStatus === 'ACCEPTED' || i.myStatus === 'DONATED' || unread.count(i.requestId) > 0) &&
+                    <ChatButton unread={unread.count(i.requestId)} onClick={() => onChat(i.requestId)} />}
                 {canAccept && <AsyncButton className="btn green small" onClick={accept}>I can donate</AsyncButton>}
                 {active && <AsyncButton className="btn secondary small" onClick={decline}>
                     {i.myStatus === 'ACCEPTED' ? "I can't come" : 'Decline'}</AsyncButton>}
             </div>
             {alreadyFilled && <p className="hint">Enough donors have already accepted. Thank you!</p>}
             {active && i.myStatus === 'ACCEPTED' &&
-                <p className="hint">Please call the hospital and go there before the deadline. They will mark your donation once done.</p>}
+                <p className="hint">Call or 💬 chat with the hospital and go there before the deadline. They will mark your donation once done.</p>}
         </div>
     );
 }

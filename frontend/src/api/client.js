@@ -163,6 +163,15 @@ export const hospitalApi = {
     create: (body) => api('POST', '/api/hospitals', body),
 };
 
+export const chatApi = {
+    donorGet: (requestId) => api('GET', `/api/me/requests/${requestId}/messages`),
+    donorSend: (requestId, body) => api('POST', `/api/me/requests/${requestId}/messages`, { body }),
+    donorUnread: () => api('GET', '/api/me/messages/unread'),
+    hospitalGet: (requestId, donorId) => api('GET', `/api/requests/${requestId}/donors/${donorId}/messages`),
+    hospitalSend: (requestId, donorId, body) => api('POST', `/api/requests/${requestId}/donors/${donorId}/messages`, { body }),
+    hospitalUnread: () => api('GET', '/api/requests/messages/unread'),
+};
+
 export const pushApi = {
     publicKey: () => api('GET', '/api/push/vapid-public-key'),
     devices: () => api('GET', '/api/me/push-subscriptions'),

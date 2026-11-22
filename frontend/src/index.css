@@ -328,3 +328,28 @@ tr.row-disabled td { opacity: .6; }
 /* installed app: respect the phone's notch / home bar */
 .topbar { padding-top: max(.6rem, env(safe-area-inset-top)); }
 body { padding-bottom: env(safe-area-inset-bottom); }
+
+/* ---------- request chat ---------- */
+.chat-btn { display: inline-flex; align-items: center; gap: .3rem; }
+.chat-btn .count, .chat-unread { background: var(--red); color: #fff; border-radius: 999px; font-size: .72rem;
+    font-weight: 700; padding: .05rem .45rem; line-height: 1.4; }
+.chat-unread { font-size: .78rem; padding: .1rem .5rem; }
+.chat-panel { width: min(520px, 100%); height: min(640px, 100%); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.chat-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+    padding: .8rem 1rem; border-bottom: 1px solid var(--line); }
+.chat-list { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: .45rem; background: var(--bg); }
+.chat-empty { margin: auto; text-align: center; color: var(--muted); font-size: .9rem; max-width: 320px; }
+.bubble { max-width: 82%; padding: .5rem .75rem; border-radius: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.bubble.theirs { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.bubble.mine { align-self: flex-end; background: var(--red); color: #fff; border-bottom-right-radius: 4px; }
+.bubble-from { font-size: .75rem; font-weight: 700; color: var(--muted); margin-bottom: .1rem; }
+.bubble-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubble-meta { font-size: .7rem; opacity: .75; text-align: right; margin-top: .15rem; }
+.chat-input { display: flex; gap: .5rem; padding: .75rem; border-top: 1px solid var(--line); background: var(--card); }
+.chat-input textarea { flex: 1; resize: none; min-height: 42px; max-height: 120px; padding: .55rem .7rem; font: inherit;
+    border: 1px solid var(--line); border-radius: 10px; }
+.chat-closed { margin: 0; padding: .9rem 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .88rem; text-align: center; }
+@media (max-width: 600px) {
+    .scan-backdrop:has(.chat-panel) { padding: 0; }
+    .chat-panel { height: 100%; border-radius: 0; }
+}

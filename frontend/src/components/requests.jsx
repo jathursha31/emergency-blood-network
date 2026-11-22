@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { requestApi } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import { ChatButton, ChatDialog, useChatUnread } from './Chat';
 import { HospitalMap } from './maps';
 import { useToast } from './Toast';
 import { AsyncButton, Badge, BloodDrop, BloodGroupSelect, Empty, readForm } from './ui';
@@ -74,7 +76,7 @@ const FILTERS = [
     ['ALL', 'All', () => true],
 ];
 
-export function RequestList({ requests, selectedId, onSelect, showHospital, onRefresh, title = 'Blood requests' }) {
+export function RequestList({ requests, selectedId, onSelect, showHospital, onRefresh, title = 'Blood requests', unread }) {
     const [filter, setFilter] = useState('ACTIVE');
     const matches = FILTERS.find(f => f[0] === filter)[2];
     const shown = requests.filter(matches);
@@ -95,14 +97,14 @@ export function RequestList({ requests, selectedId, onSelect, showHospital, onRe
             <div className="list">
                 {shown.length ? shown.map(r => (
                     <RequestRow key={r.id} r={r} selected={r.id === selectedId} showHospital={showHospital}
-                                onClick={() => onSelect(r.id)} />
+                                unread={unread ? unread.total(r.id) : 0} onClick={() => onSelect(r.id)} />
                 )) : <Empty>No requests here.</Empty>}
             </div>
         </section>
     );
 }
 
-function RequestRow({ r, selected, showHospital, onClick }) {
+function RequestRow({ r, selected, showHospital, unread, onClick }) {
     const active = isActiveRequest(r.status);
     const pct = Math.min(100, Math.round(100 * r.donatedCount / r.unitsNeeded));
     return (
@@ -115,7 +117,7 @@ function RequestRow({ r, selected, showHospital, onClick }) {
                         {r.restock && <span className="badge b-blue" style={{ marginLeft: '.35rem' }}>🔁 Restock</span>}
                         {showHospital && <div className="small muted">{r.hospitalName}</div>}</div>
                 </div>
-                <div className="row"><Badge value={r.urgency} /> <Badge value={r.status} /></div>
+                <div className="row">{unread > 0 && <span className="chat-unread" title="Unread donor messages">💬 {unread}</span>}<Badge value={r.urgency} /> <Badge value={r.status} /></div>
             </div>
             <div className="kv">
                 <span>👥 {r.notifiedCount} notified · {r.acceptedCount} accepted · {r.donatedCount}/{r.unitsNeeded} donated</span>
@@ -129,8 +131,9 @@ function RequestRow({ r, selected, showHospital, onClick }) {
 
 // ---------------------------------------------------------------- detail
 
-export function RequestDetail({ r, hospital, onClose, onChanged }) {
+export function RequestDetail({ r, hospital, onClose, onChanged, unread }) {
     const toast = useToast();
+    const [chatDonor, setChatDonor] = useState(null);
     const active = isActiveRequest(r.status);
 
     const cancel = async () => {
@@ -191,7 +194,7 @@ export function RequestDetail({ r, hospital, onClose, onChanged }) {
             {r.donors.length ? (
                 <div className="table-wrap">
                     <table>
-                        <thead><tr><th>Donor</th><th>Group</th><th>Distance</th><th>Status</th><th>Phone</th><th /></tr></thead>
+                        <thead><tr><th>Donor</th><th>Group</th><th>Distance</th><th>Status</th><th>Phone</th><th /><th /></tr></thead>
                         <tbody>
                         {r.donors.map(d => {
                             const revealed = d.status === 'ACCEPTED' || d.status === 'DONATED';
@@ -204,6 +207,8 @@ export function RequestDetail({ r, hospital, onClose, onChanged }) {
                                     <td>{revealed ? <a href={`tel:${d.phone}`}>{d.phone}</a> : <span className="muted">{d.phone}</span>}</td>
                                     <td>{d.status === 'ACCEPTED' && active &&
                                         <AsyncButton className="btn green small" onClick={() => markDonated(d)}>Mark donated</AsyncButton>}</td>
+                                    <td>{(revealed || (unread && unread.count(r.id, d.donorId) > 0)) &&
+                                        <ChatButton unread={unread ? unread.count(r.id, d.donorId) : 0} onClick={() => setChatDonor(d.donorId)} />}</td>
                                 </tr>
                             );
                         })}
@@ -214,6 +219,8 @@ export function RequestDetail({ r, hospital, onClose, onChanged }) {
                 <Empty>No eligible donors found yet within {r.searchRadiusKm} km.
                     {active && ' The search radius widens automatically every 30 minutes.'}</Empty>
             )}
+            {chatDonor && <ChatDialog side="hospital" requestId={r.id} donorId={chatDonor}
+                                      onClose={() => { setChatDonor(null); unread?.refresh(); }} />}
         </section>
     );
 }
@@ -223,14 +230,20 @@ export function RequestDetail({ r, hospital, onClose, onChanged }) {
 /** The requests list with the selected request's detail panel underneath. */
 export function RequestsPanel({ requests, hospitals, selectedId, setSelectedId, reload, showHospital, title }) {
     const selected = requests.find(r => r.id === selectedId);
+    const { session } = useAuth();
+    const toast = useToast();
+    const unread = useChatUnread('hospital', (d) => {
+        // admins see every hospital's chats: no pop-ups for them
+        if (session?.role === 'HOSPITAL') toast(`💬 New message from a donor on request #${d.requestId}`, 'ok');
+    });
     return (
         <div className="stack">
             <RequestList requests={requests} selectedId={selectedId} onSelect={setSelectedId}
-                         showHospital={showHospital} onRefresh={reload} title={title} />
+                         showHospital={showHospital} onRefresh={reload} title={title} unread={unread} />
             {selected && (
                 <RequestDetail key={selected.id} r={selected}
                                hospital={hospitals.find(h => h.id === selected.hospitalId)}
-                               onClose={() => setSelectedId(null)} onChanged={reload} />
+                               onClose={() => setSelectedId(null)} onChanged={reload} unread={unread} />
             )}
         </div>
     );

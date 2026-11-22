@@ -34,6 +34,7 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 | Audit log | Append-only record of logins, failed logins (with reason and IP), OTP logins, logouts, token-theft detection, password changes and resets, disables and enables, sign-ups and new hospitals. Each entry is written in its own transaction, so failures are recorded too. Filterable in the admin UI. |
 | OTP | Sign-up verifies the mobile with a 6-digit SMS code, and donors can log in with a code instead of a password. Codes are hashed, expire, are rate limited and allow 5 attempts. |
 | Mobile app (PWA) | Installable on Android, iPhone and desktop ("📲 Install app"), with an offline page when there is no signal. Donors can turn on **push notifications**: a nearby blood request or camp invite pops up on the phone even when the app is closed. Web Push is built with JDK crypto only (VAPID / RFC 8292, payload encryption / RFC 8291, checked against the RFC test vector). Logging out stops alerts on that device. |
+| Request chat | Once a donor accepts, the hospital and that donor can chat inside the request ("Gate 2, 1st floor", "parking?"). Messages arrive live, unread counts show on the request and the donor's inbox, "Seen" ticks show when the other side read them, and hospital messages reach the donor's phone as a push notification. Only the request's hospital (or an admin) and the accepted donor can see it. It stays open for 24 h after the request closes, then becomes read-only. Each side can send up to 20 messages a minute. |
 | WhatsApp | `SMS_CHANNEL=whatsapp` sends the same notifications over Twilio WhatsApp. |
 | API docs | Swagger UI at `/swagger-ui.html`, with an **Authorize** button for the JWT. |
 
@@ -203,6 +204,10 @@ These defaults are for local development only. Elsewhere, set the `JWT_SECRET` (
 | GET | `/api/me/requests` | DONOR | Requests I was notified about |
 | POST | `/api/me/requests/{id}/accept` | DONOR | Accept |
 | POST | `/api/me/requests/{id}/decline` | DONOR | Decline / back out |
+| GET/POST | `/api/me/requests/{id}/messages` | DONOR | Read (marks as read) / send `{"body"}` in my chat with the hospital |
+| GET | `/api/me/messages/unread` | DONOR | Unread hospital messages per request |
+| GET/POST | `/api/requests/{id}/donors/{donorId}/messages` | HOSPITAL, ADMIN | Chat with a donor who accepted |
+| GET | `/api/requests/messages/unread` | HOSPITAL, ADMIN | Unread donor messages per request and donor |
 | GET | `/api/push/vapid-public-key` | public | Server key the browser subscribes with |
 | GET/POST/DELETE | `/api/me/push-subscriptions` | DONOR | Devices with alerts on / add this browser `{"endpoint","keys":{"p256dh","auth"}}` / remove it `{"endpoint"}` |
 | POST | `/api/me/push-subscriptions/test` | DONOR | Send a test alert to my devices |
