@@ -113,9 +113,20 @@ public class AuthService {
         return accounts.save(account);
     }
 
-    /** Access token (JWT) response for an account; used by login, sign-up and refresh. */
+    /** Access token (JWT) response for an account, without a session id. */
     public TokenResponse tokenFor(UserAccount account) {
-        JwtService.IssuedToken token = jwtService.issue(account);
+        return tokenFor(account, null);
+    }
+
+    /** Access token tied to a login session (refresh-token family), so logging that session out kills it at once. */
+    @Transactional(readOnly = true)
+    public TokenResponse sessionToken(String username, String sessionId) {
+        UserAccount account = accounts.findByUsername(username).orElseThrow(InvalidCredentialsException::new);
+        return tokenFor(account, sessionId);
+    }
+
+    public TokenResponse tokenFor(UserAccount account, String sessionId) {
+        JwtService.IssuedToken token = jwtService.issue(account, sessionId);
         return new TokenResponse(token.value(), "Bearer", token.expiresInSeconds(), token.expiresAt(),
                 account.getUsername(), account.getRole(),
                 account.getDonor() == null ? null : account.getDonor().getId(),

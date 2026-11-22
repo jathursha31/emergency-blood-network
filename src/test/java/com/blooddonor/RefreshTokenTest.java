@@ -93,7 +93,88 @@ class RefreshTokenTest {
         assertThat(expired.body()).contains("expired");
     }
 
+    // ------------------------------------------------------------------ instant revocation of access tokens
+
+    @Test
+    void accessTokenStopsWorkingTheMomentItsSessionLogsOut() throws Exception {
+        HttpResponse<String> login = login();
+        String access = accessToken(login);
+        assertThat(get("/api/auth/me", access).statusCode()).isEqualTo(200);
+
+        assertThat(post("/api/auth/logout", null, null, cookieValue(login)).statusCode()).isEqualTo(204);
+        HttpResponse<String> after = get("/api/auth/me", access);
+        assertThat(after.statusCode()).isEqualTo(401); // not after 15 minutes: right now
+        assertThat(after.headers().firstValue("WWW-Authenticate").orElse("")).contains("logged out");
+    }
+
+    @Test
+    void otherSessionsKeepWorkingAfterOneDeviceLogsOut() throws Exception {
+        HttpResponse<String> laptop = login();
+        HttpResponse<String> phone = login();
+        post("/api/auth/logout", null, null, cookieValue(laptop));
+
+        assertThat(get("/api/auth/me", accessToken(laptop)).statusCode()).isEqualTo(401);
+        assertThat(get("/api/auth/me", accessToken(phone)).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void refreshedTokenBelongsToTheSameSession() throws Exception {
+        HttpResponse<String> login = login();
+        HttpResponse<String> refreshed = refresh(cookieValue(login));
+        String newAccess = accessToken(refreshed);
+        assertThat(get("/api/auth/me", newAccess).statusCode()).isEqualTo(200);
+
+        post("/api/auth/logout", null, null, cookieValue(refreshed));
+        assertThat(get("/api/auth/me", newAccess).statusCode()).isEqualTo(401);
+        assertThat(get("/api/auth/me", accessToken(login)).statusCode()).isEqualTo(401);
+    }
+
+    @Test
+    void logoutEverywhereKillsEveryAccessTokenButNewLoginsWork() throws Exception {
+        HttpResponse<String> a = login();
+        HttpResponse<String> b = login();
+        post("/api/auth/logout-all", null, accessToken(a), cookieValue(a));
+
+        assertThat(get("/api/auth/me", accessToken(a)).statusCode()).isEqualTo(401);
+        assertThat(get("/api/auth/me", accessToken(b)).statusCode()).isEqualTo(401);
+        assertThat(get("/api/auth/me", accessToken(login())).statusCode()).isEqualTo(200);
+    }
+
+    @Test
+    void liveStreamIsClosedOnLogout() throws Exception {
+        HttpResponse<String> login = login();
+        java.util.concurrent.BlockingQueue<String> lines = new java.util.concurrent.LinkedBlockingQueue<>();
+        java.util.concurrent.CompletableFuture<Void> done = http.sendAsync(
+                        HttpRequest.newBuilder(uri("/api/live")).header("Authorization", "Bearer " + accessToken(login))
+                                .header("Accept", "text/event-stream").GET().build(),
+                        HttpResponse.BodyHandlers.ofLines())
+                .thenAccept(res -> res.body().forEach(lines::add));
+        assertThat(waitFor(lines, "event:connected")).isTrue();
+
+        post("/api/auth/logout", null, null, cookieValue(login));
+        assertThat(waitFor(lines, "event:session.ended")).isTrue();
+        done.get(5, java.util.concurrent.TimeUnit.SECONDS); // the server ended the stream
+    }
+
+    private static boolean waitFor(java.util.concurrent.BlockingQueue<String> q, String line) throws InterruptedException {
+        long end = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        while (System.nanoTime() < end) {
+            String l = q.poll(200, java.util.concurrent.TimeUnit.MILLISECONDS);
+            if (l != null && l.replace(" ", "").startsWith(line)) return true;
+        }
+        return false;
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private HttpResponse<String> get(String path, String bearer) throws Exception {
+        return http.send(HttpRequest.newBuilder(uri(path)).header("Authorization", "Bearer " + bearer).GET().build(),
+                HttpResponse.BodyHandlers.ofString());
+    }
+
+    private URI uri(String path) {
+        return URI.create("http://localhost:" + env.getProperty("local.server.port") + path);
+    }
 
     private HttpResponse<String> login() throws Exception {
         HttpResponse<String> r = post("/api/auth/login", "{\"username\":\"admin\",\"password\":\"admin123\"}", null, null);

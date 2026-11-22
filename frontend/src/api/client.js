@@ -52,6 +52,11 @@ export class ApiError extends Error {
     }
 }
 
+/** Endpoints where 401 means "wrong password/code", not "access token expired". */
+const isCredentialEndpoint = (path) =>
+    ['/api/auth/login', '/api/auth/register', '/api/auth/refresh', '/api/auth/logout'].includes(path)
+    || path.startsWith('/api/auth/otp/');
+
 export async function api(method, path, body, isRetry = false) {
     const headers = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
@@ -68,10 +73,10 @@ export async function api(method, path, body, isRetry = false) {
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
-    if (res.status === 401 && token && !path.startsWith('/api/auth/') || (res.status === 401 && path === '/api/auth/logout-all')) {
+    if (res.status === 401 && token && !isCredentialEndpoint(path)) {
         if (!isRetry && await refreshAccessToken()) return api(method, path, body, true);
         onUnauthorized();
-        throw new ApiError('Your session has expired. Please log in again.', 401);
+        throw new ApiError('You have been logged out (session expired or ended on another device). Please log in again.', 401);
     }
     if (!res.ok) {
         let msg = (data && (data.detail || data.title)) || `Request failed (${res.status})`;

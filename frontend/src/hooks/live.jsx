@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { refreshAccessToken } from '../api/client';
+import { api, refreshAccessToken } from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 
 /**
@@ -63,7 +63,12 @@ export function LiveProvider({ children }) {
                     for (;;) {
                         const { value, done } = await reader.read();
                         if (done) break;
-                        parseSse(value, state, (evt) => listeners.current.forEach(fn => fn(evt)));
+                        parseSse(value, state, (evt) => {
+                            // The server ended this login (logout on another tab/device, or "all devices").
+                            // Any API call now gets a 401 that can't be refreshed, which logs this tab out.
+                            if (evt.type === 'session.ended') { api('GET', '/api/auth/me').catch(() => {}); return; }
+                            listeners.current.forEach(fn => fn(evt));
+                        });
                     }
                 } catch {
                     if (stopped) return;

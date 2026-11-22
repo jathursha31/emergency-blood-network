@@ -26,7 +26,7 @@ export default function App() {
     const toast = useToast();
 
     useEffect(() => {
-        if (expired) toast('Your session has expired. Please log in again.', 'error');
+        if (expired) toast('You have been logged out (session expired or ended on another device). Please log in again.', 'error');
     }, [expired, toast]);
 
     return (

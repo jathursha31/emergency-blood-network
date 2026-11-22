@@ -7,6 +7,7 @@ import com.blooddonor.repository.RefreshTokenRepository;
 import com.blooddonor.repository.UserAccountRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,22 +40,25 @@ public class RefreshTokenService {
     private final UserAccountRepository accounts;
     private final SecurityProperties props;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
     private final SecureRandom random = new SecureRandom();
 
     public RefreshTokenService(RefreshTokenRepository tokens, UserAccountRepository accounts,
-                               SecurityProperties props, Clock clock) {
+                               SecurityProperties props, Clock clock, ApplicationEventPublisher events) {
         this.tokens = tokens;
         this.accounts = accounts;
         this.props = props;
         this.clock = clock;
+        this.events = events;
     }
 
-    /** New session after a successful login or sign-up. Returns the raw token for the cookie. */
+    /** New session after a successful login or sign-up. Returns the raw token for the cookie and the session id. */
     @Transactional
-    public String issue(String username, String userAgent) {
+    public Issued issue(String username, String userAgent) {
         UserAccount account = accounts.findByUsername(username)
                 .orElseThrow(() -> new IllegalStateException("No account " + username));
-        return create(account, UUID.randomUUID().toString(), userAgent);
+        String sessionId = UUID.randomUUID().toString();
+        return new Issued(create(account, sessionId, userAgent), sessionId);
     }
 
     /**
@@ -72,6 +76,7 @@ public class RefreshTokenService {
                 int n = tokens.revokeFamily(current.getFamily(), now(), "REUSE_DETECTED");
                 log.warn("Refresh token reuse for '{}': revoked {} session token(s) of that login",
                         current.getAccount().getUsername(), n);
+                events.publishEvent(new SessionEvents.SessionEnded(current.getAccount().getUsername(), current.getFamily()));
                 throw new InvalidRefreshTokenException("This session was used somewhere else and has been closed. Please log in again.");
             }
             throw new InvalidRefreshTokenException("You have been logged out. Please log in again.");
@@ -81,14 +86,14 @@ public class RefreshTokenService {
         }
         UserAccount account = current.getAccount();
         if (!account.isEnabled()) {
-            tokens.revokeAllForAccount(account.getId(), now(), "LOGOUT_ALL");
+            revokeAllFor(account);
             throw new InvalidRefreshTokenException("This account is disabled.");
         }
 
         current.setRevokedAt(now());
         current.setRevokedReason("ROTATED");
         String next = create(account, current.getFamily(), userAgent);
-        return new Rotated(account, next);
+        return new Rotated(account, next, current.getFamily());
     }
 
     /** Logout on this device. Unknown or already revoked tokens are ignored. */
@@ -98,15 +103,31 @@ public class RefreshTokenService {
         tokens.findByTokenHash(hash(raw)).filter(t -> t.getRevokedAt() == null).ifPresent(t -> {
             t.setRevokedAt(now());
             t.setRevokedReason("LOGOUT");
+            events.publishEvent(new SessionEvents.SessionEnded(t.getAccount().getUsername(), t.getFamily()));
         });
     }
 
-    /** Logout on every device. Returns how many sessions were closed. */
+    /**
+     * Logout on every device: revokes every refresh token and bumps the account's token version,
+     * which makes every access token already handed out invalid at once. Returns how many sessions were closed.
+     */
     @Transactional
     public int revokeAll(String username) {
-        return accounts.findByUsername(username)
-                .map(a -> tokens.revokeAllForAccount(a.getId(), now(), "LOGOUT_ALL"))
-                .orElse(0);
+        return accounts.findByUsername(username).map(this::revokeAllFor).orElse(0);
+    }
+
+    private int revokeAllFor(UserAccount account) {
+        int n = tokens.revokeAllForAccount(account.getId(), now(), "LOGOUT_ALL");
+        account.setTokenVersion(account.getTokenVersion() + 1);
+        accounts.save(account);
+        events.publishEvent(new SessionEvents.AllSessionsEnded(account.getUsername()));
+        return n;
+    }
+
+    /** Is this login session still open (at least one usable refresh token)? */
+    @Transactional(readOnly = true)
+    public boolean isSessionActive(String sessionId) {
+        return tokens.existsActiveInFamily(sessionId, now());
     }
 
     @Transactional(readOnly = true)
@@ -157,6 +178,9 @@ public class RefreshTokenService {
         return LocalDateTime.now(clock);
     }
 
-    public record Rotated(UserAccount account, String refreshToken) {
+    public record Rotated(UserAccount account, String refreshToken, String sessionId) {
+    }
+
+    public record Issued(String refreshToken, String sessionId) {
     }
 }

@@ -42,6 +42,10 @@ public class UserAccount {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    /** Copied into every access token ("tv" claim). Bumping it invalidates all of them at once. */
+    @Column(nullable = false, columnDefinition = "integer default 0")
+    private int tokenVersion;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 }

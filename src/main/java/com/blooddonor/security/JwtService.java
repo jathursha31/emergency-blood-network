@@ -25,6 +25,14 @@ public class JwtService {
     }
 
     public IssuedToken issue(UserAccount account) {
+        return issue(account, null);
+    }
+
+    /**
+     * @param sessionId the refresh-token family this access token belongs to ("sid" claim), so logging
+     *                  out that session can reject the access token at once; null for tokens without a session
+     */
+    public IssuedToken issue(UserAccount account, String sessionId) {
         Instant now = clock.instant();
         Instant expiresAt = now.plus(props.jwtExpiryMinutes(), ChronoUnit.MINUTES);
 
@@ -33,7 +41,9 @@ public class JwtService {
                 .subject(account.getUsername())
                 .issuedAt(now)
                 .expiresAt(expiresAt)
-                .claim(CurrentUser.ROLE_CLAIM, account.getRole().name());
+                .claim(CurrentUser.ROLE_CLAIM, account.getRole().name())
+                .claim(CurrentUser.TOKEN_VERSION_CLAIM, account.getTokenVersion());
+        if (sessionId != null) claims.claim(CurrentUser.SESSION_CLAIM, sessionId);
         if (account.getDonor() != null) claims.claim(CurrentUser.DONOR_CLAIM, account.getDonor().getId());
         if (account.getHospital() != null) claims.claim(CurrentUser.HOSPITAL_CLAIM, account.getHospital().getId());
 

@@ -29,6 +29,11 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
     @Query("select count(t) from RefreshToken t where t.account.id = :accountId and t.revokedAt is null and t.expiresAt > :now")
     long countActive(@Param("accountId") Long accountId, @Param("now") LocalDateTime now);
 
+    @Query("""
+            select count(t) > 0 from RefreshToken t
+            where t.family = :family and t.revokedAt is null and t.expiresAt > :now""")
+    boolean existsActiveInFamily(@Param("family") String family, @Param("now") LocalDateTime now);
+
     @Modifying
     @Query("delete from RefreshToken t where t.expiresAt < :before")
     int deleteExpiredBefore(@Param("before") LocalDateTime before);

@@ -76,7 +76,7 @@ public class AuthController {
         try {
             RefreshTokenService.Rotated rotated = refreshTokens.rotate(refreshToken, http.getHeader(HttpHeaders.USER_AGENT));
             setCookie(res, rotated.refreshToken(), refreshTokens.maxAgeSeconds());
-            return authService.tokenFor(rotated.account());
+            return authService.tokenFor(rotated.account(), rotated.sessionId());
         } catch (RuntimeException e) {
             setCookie(res, "", 0); // drop a dead cookie so the browser stops sending it
             throw e;
@@ -107,10 +107,14 @@ public class AuthController {
 
     // ---------------------------------------------------------------- helpers
 
-    private TokenResponse startSession(TokenResponse token, HttpServletRequest http, HttpServletResponse res) {
-        String refresh = refreshTokens.issue(token.username(), http.getHeader(HttpHeaders.USER_AGENT));
-        setCookie(res, refresh, refreshTokens.maxAgeSeconds());
-        return token;
+    /**
+     * The credentials were already checked (login/sign-up/OTP). Open a session: refresh cookie plus an
+     * access token that carries the session id, so logging this session out also rejects that token at once.
+     */
+    private TokenResponse startSession(TokenResponse checked, HttpServletRequest http, HttpServletResponse res) {
+        RefreshTokenService.Issued session = refreshTokens.issue(checked.username(), http.getHeader(HttpHeaders.USER_AGENT));
+        setCookie(res, session.refreshToken(), refreshTokens.maxAgeSeconds());
+        return authService.sessionToken(checked.username(), session.sessionId());
     }
 
     private void setCookie(HttpServletResponse res, String value, long maxAgeSeconds) {

@@ -13,7 +13,7 @@ Everything is protected with **JWT login and three roles**: ADMIN, HOSPITAL and 
 |---|---|
 | JWT security | Stateless Spring Security with HS256-signed tokens (Nimbus). BCrypt password hashes. Three roles, plus ownership checks: a hospital only sees its own requests, and a donor's id always comes from the token. |
 | Sessions | 15-minute access tokens plus a 14-day refresh token in an **httpOnly, SameSite=Strict cookie** that JavaScript can't read. Refresh tokens are stored hashed and **rotated on every use**. Replaying an old one revokes every session from that login (theft detection). Logout revokes the token, and "All devices" ends every session. The browser renews tokens silently. |
-| Sessions | 15-minute access tokens plus a 14-day refresh token in an **httpOnly, SameSite=Strict cookie** (JavaScript can't read it). Refresh tokens are stored hashed and **rotated on every use**. Replaying an old one revokes every session from that login (theft detection). Logout revokes the token, and "All devices" ends every session. The browser renews tokens silently. |
+| Instant logout | Access tokens carry their session id (`sid`) and the account's token version (`tv`). A validator checks both on every request, cached for 30 s and updated immediately on logout, so a logged-out token gets **401 at once**, not after 15 minutes. The session's open live stream is closed too, and other tabs log out by themselves. |
 | Blood compatibility | `BloodGroup` encodes A/B/Rh antigens. A B+ patient gets B+, B-, O+, O- donors. Exact-group donors are listed first so universal O- blood is saved. |
 | Geo search | A lat/lng bounding-box query in PostgreSQL narrows the candidates, then the Haversine formula gives exact km. Works on plain PostgreSQL, no extension needed. |
 | Eligibility rules | Donation gap of at least 90 days, age 18–65, and the donor's availability switch. All rules are configurable. |
@@ -294,7 +294,7 @@ jobs.refresh-token-cleanup.cron=0 30 3 * * *
 
 ## Ideas to extend
 
-- Revoking access tokens instantly (a denylist or token-version check), not only when they expire after 15 minutes
+- Sharing session revocations between several app instances (Redis pub/sub) when scaling out
 - PostGIS `geography` column and `ST_DWithin` for very large donor tables
 - An Indian SMS gateway with DLT templates (MSG91, Fast2SMS)
 - Analytics as SQL aggregate queries or a reporting table for large data
